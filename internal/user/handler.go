@@ -1,0 +1,82 @@
+package user
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/oopbest/ecommerce-app/internal/domain"
+)
+
+type Handler struct {
+	service domain.UserService
+}
+
+// NewHandler Constructor สำหรับสร้าง User Handler
+func NewHandler(service domain.UserService) *Handler {
+	return &Handler{
+		service: service,
+	}
+}
+
+// RegisterRoutes ลงทะเบียน Auth Routes เข้ากับ ServeMux
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/auth/register", h.handleRegister)
+	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
+}
+
+// POST /api/auth/register
+func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
+	var input domain.RegisterInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.sendError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
+		return
+	}
+
+	res, err := h.service.Register(input)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserAlreadyExists) {
+			h.sendError(w, http.StatusConflict, err.Error()) // 409 Conflict (Email ซ้ำ)
+			return
+		}
+		h.sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.sendJSON(w, http.StatusCreated, res)
+}
+
+// POST /api/auth/login
+func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var input domain.LoginInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.sendError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	res, err := h.service.Login(input)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidCredentials) {
+			h.sendError(w, http.StatusUnauthorized, "Invalid email or password") // 401 Unauthorized
+			return
+		}
+		h.sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.sendJSON(w, http.StatusOK, res)
+}
+
+// ==========================================
+// Helper Methods
+// ==========================================
+
+func (h *Handler) sendJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+func (h *Handler) sendError(w http.ResponseWriter, status int, message string) {
+	h.sendJSON(w, status, map[string]string{"error": message})
+}

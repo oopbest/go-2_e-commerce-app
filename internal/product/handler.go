@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/oopbest/ecommerce-app/internal/domain"
+	"github.com/oopbest/ecommerce-app/internal/middleware"
 )
 
 // Handler จัดการ HTTP Request สำหรับ Product
@@ -21,13 +22,15 @@ func NewHandler(service domain.ProductService) *Handler {
 	}
 }
 
-// RegisterRoutes ลงทะเบียน Endpoint เข้ากับ ServeMux
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+// RegisterRoutes ลงทะเบียน Endpoint เข้ากับ ServeMux พร้อมป้องกันด้วย Auth Middleware
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc) http.HandlerFunc) {
+	// Public Endpoints (ไม่ต้องใช้ Token)
 	mux.HandleFunc("GET /api/products", h.handleGetProducts)
 	mux.HandleFunc("GET /api/products/{id}", h.handleGetProductByID)
-	mux.HandleFunc("POST /api/products", h.handleCreateProduct)
-	mux.HandleFunc("PUT /api/products/{id}", h.handleUpdateProduct)
-	mux.HandleFunc("DELETE /api/products/{id}", h.handleDeleteProduct)
+	// Protected Endpoints (ต้องมี Token และต้องเป็น Admin เท่านั้น)
+	mux.HandleFunc("POST /api/products", auth(middleware.RequireRole("admin", h.handleCreateProduct)))
+	mux.HandleFunc("PUT /api/products/{id}", auth(middleware.RequireRole("admin", h.handleUpdateProduct)))
+	mux.HandleFunc("DELETE /api/products/{id}", auth(middleware.RequireRole("admin", h.handleDeleteProduct)))
 }
 
 // GET /api/products

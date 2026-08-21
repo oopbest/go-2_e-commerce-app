@@ -13,3 +13,13 @@ INSERT INTO products (name, description, price, stock) VALUES
 ('Mechanical Keyboard', 'RGB Hot-swappable', 2590.00, 15),
 ('Wireless Mouse', 'Ergonomic 2.4GHz', 1290.00, 30),
 ('Gaming Headset', '7.1 Surround Sound', 1990.00, 20);
+
+-- สร้างตาราง users
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'customer',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
