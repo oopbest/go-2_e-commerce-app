@@ -28,7 +28,18 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc)
 	mux.HandleFunc("GET /api/orders/{id}", auth(h.handleGetOrderByID))
 }
 
-// POST /api/orders/checkout
+// handleCheckout godoc
+// @Summary      Checkout order
+// @Description  Create an order with atomic stock deduction in database transaction
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        input body     domain.CheckoutInput true "Cart Items to Checkout"
+// @Success      201   {object} domain.Order
+// @Failure      400   {object} map[string]string
+// @Failure      401   {object} map[string]string
+// @Router       /api/orders/checkout [post]
 func (h *Handler) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	// 1. ดึง Claims จาก Context ที่ AuthMiddleware ตรวจสอบไว้
 	claims, ok := middleware.GetUserClaims(r)
@@ -58,7 +69,15 @@ func (h *Handler) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusCreated, order)
 }
 
-// GET /api/orders
+// handleGetOrders godoc
+// @Summary      Get user orders
+// @Description  Get list of orders (Customer: own orders, Admin: all orders)
+// @Tags         Orders
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}  domain.Order
+// @Failure      401  {object} map[string]string
+// @Router       /api/orders [get]
 func (h *Handler) handleGetOrders(w http.ResponseWriter, r *http.Request) {
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
@@ -88,7 +107,18 @@ func (h *Handler) handleGetOrders(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, orders)
 }
 
-// GET /api/orders/{id}
+// handleGetOrderByID godoc
+// @Summary      Get order by ID
+// @Description  Get detailed order information by ID
+// @Tags         Orders
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path     int  true "Order ID"
+// @Success      200  {object} domain.Order
+// @Failure      400  {object} map[string]string
+// @Failure      401  {object} map[string]string
+// @Failure      404  {object} map[string]string
+// @Router       /api/orders/{id} [get]
 func (h *Handler) handleGetOrderByID(w http.ResponseWriter, r *http.Request) {
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {

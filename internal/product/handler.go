@@ -33,7 +33,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc)
 	mux.HandleFunc("DELETE /api/products/{id}", auth(middleware.RequireRole("admin", h.handleDeleteProduct)))
 }
 
-// GET /api/products
+// handleGetProducts godoc
+// @Summary      Get all products
+// @Description  Retrieve a list of all products (Cached in Redis)
+// @Tags         Products
+// @Produce      json
+// @Success      200  {array}   domain.Product
+// @Failure      500  {object}  map[string]string
+// @Router       /api/products [get]
 func (h *Handler) handleGetProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := h.service.GetAllProducts()
 	if err != nil {
@@ -43,7 +50,16 @@ func (h *Handler) handleGetProducts(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, products)
 }
 
-// GET /api/products/{id}
+// handleGetProductByID godoc
+// @Summary      Get product by ID
+// @Description  Retrieve single product details by ID
+// @Tags         Products
+// @Produce      json
+// @Param        id   path      int  true  "Product ID"
+// @Success      200  {object}  domain.Product
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /api/products/{id} [get]
 func (h *Handler) handleGetProductByID(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -64,7 +80,19 @@ func (h *Handler) handleGetProductByID(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, product)
 }
 
-// POST /api/products
+// handleCreateProduct godoc
+// @Summary      Create a new product
+// @Description  Create a new product (Admin Only)
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        input body      domain.CreateProductInput true "Create Product Data"
+// @Success      201   {object}  domain.Product
+// @Failure      400   {object}  map[string]string
+// @Failure      401   {object}  map[string]string
+// @Failure      403   {object}  map[string]string
+// @Router       /api/products [post]
 func (h *Handler) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	var input domain.CreateProductInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -81,7 +109,21 @@ func (h *Handler) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusCreated, product)
 }
 
-// PUT /api/products/{id}
+// handleUpdateProduct godoc
+// @Summary      Update a product
+// @Description  Update product details by ID (Admin Only)
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                       true "Product ID"
+// @Param        input body      domain.UpdateProductInput true "Update Product Data"
+// @Success      200   {object}  domain.Product
+// @Failure      400   {object}  map[string]string
+// @Failure      401   {object}  map[string]string
+// @Failure      403   {object}  map[string]string
+// @Failure      404   {object}  map[string]string
+// @Router       /api/products/{id} [put]
 func (h *Handler) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -108,7 +150,18 @@ func (h *Handler) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, product)
 }
 
-// DELETE /api/products/{id}
+// handleDeleteProduct godoc
+// @Summary      Delete a product
+// @Description  Delete product by ID (Admin Only)
+// @Tags         Products
+// @Security     BearerAuth
+// @Param        id   path     int  true "Product ID"
+// @Success      204  "No Content"
+// @Failure      400  {object} map[string]string
+// @Failure      401  {object} map[string]string
+// @Failure      403  {object} map[string]string
+// @Failure      404  {object} map[string]string
+// @Router       /api/products/{id} [delete]
 func (h *Handler) handleDeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {

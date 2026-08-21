@@ -11,13 +11,34 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/oopbest/ecommerce-app/docs" // Import Docs ที่จะถูกสร้างโดย swag init
 	"github.com/oopbest/ecommerce-app/internal/config"
 	"github.com/oopbest/ecommerce-app/internal/database"
 	"github.com/oopbest/ecommerce-app/internal/middleware"
 	"github.com/oopbest/ecommerce-app/internal/order"
 	"github.com/oopbest/ecommerce-app/internal/product"
 	"github.com/oopbest/ecommerce-app/internal/user"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
+
+// @title           Go E-Commerce REST API
+// @version         1.0
+// @description     High-performance production-ready E-Commerce Backend with JWT Auth, PostgreSQL, and Redis Cache.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    https://github.com/oopbest/go-2_e-commerce-app
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token. Example: "Bearer eyJhbGciOi..."
 
 func main() {
 	// ==========================================
@@ -32,7 +53,6 @@ func main() {
 	if cfg.AppEnv == "production" {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	} else {
-		// ใน Dev ใช้ Debug Level เพื่อให้เห็น Log Cache Hit / Miss
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
 	slog.SetDefault(logger)
@@ -60,7 +80,7 @@ func main() {
 	}()
 
 	// ==========================================
-	// 4. เชื่อมต่อ Redis In-Memory Cache (ใหม่!)
+	// 4. เชื่อมต่อ Redis In-Memory Cache
 	// ==========================================
 	rdb, err := database.NewRedisClient(cfg.RedisAddr, cfg.RedisPassword)
 	if err != nil {
@@ -75,18 +95,15 @@ func main() {
 	// ==========================================
 	// 5. Dependency Injection: Modules
 	// ==========================================
-	// User Module
 	userRepo := user.NewRepository(db)
 	userService := user.NewService(userRepo, cfg.JWTSecret)
 	userHandler := user.NewHandler(userService)
 
-	// Product Module (หุ้มด้วย Redis Cache Decorator! แคชไว้ 5 นาที)
 	productPostgresRepo := product.NewPostgresRepository(db)
 	productRepo := product.NewCachedRepository(productPostgresRepo, rdb, 5*time.Minute)
 	productService := product.NewService(productRepo)
 	productHandler := product.NewHandler(productService)
 
-	// Order Module
 	orderRepo := order.NewRepository(db)
 	orderService := order.NewService(orderRepo)
 	orderHandler := order.NewHandler(orderService)
@@ -102,6 +119,9 @@ func main() {
 	userHandler.RegisterRoutes(mux)
 	productHandler.RegisterRoutes(mux, auth)
 	orderHandler.RegisterRoutes(mux, auth)
+
+	// 📖 Swagger UI Endpoint (ใหม่!)
+	mux.HandleFunc("GET /swagger/", httpSwagger.WrapHandler)
 
 	// Health Check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +154,7 @@ func main() {
 	// ==========================================
 	go func() {
 		slog.Info("🚀 Server started successfully", "port", cfg.Port, "env", cfg.AppEnv)
+		slog.Info("📖 Swagger UI available at", "url", "http://localhost:"+cfg.Port+"/swagger/index.html")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("Server failed to start", "error", err)
 			os.Exit(1)

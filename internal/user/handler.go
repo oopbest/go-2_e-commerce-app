@@ -25,7 +25,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
 }
 
-// POST /api/auth/register
+// handleRegister godoc
+// @Summary      Register a new user
+// @Description  Register a new customer or admin user and return JWT token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        input body domain.RegisterInput true "User Registration Data"
+// @Success      201  {object} domain.AuthResponse
+// @Failure      400  {object} map[string]string
+// @Failure      409  {object} map[string]string
+// @Router       /api/auth/register [post]
 func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var input domain.RegisterInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -46,7 +56,17 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusCreated, res)
 }
 
-// POST /api/auth/login
+// handleLogin godoc
+// @Summary      User Login
+// @Description  Authenticate user with email and password to receive JWT token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        input body domain.LoginInput true "User Login Credentials"
+// @Success      200  {object} domain.AuthResponse
+// @Failure      400  {object} map[string]string
+// @Failure      401  {object} map[string]string
+// @Router       /api/auth/login [post]
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var input domain.LoginInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
