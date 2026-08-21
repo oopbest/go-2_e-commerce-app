@@ -30,10 +30,9 @@ func main() {
 	// ==========================================
 	var logger *slog.Logger
 	if cfg.AppEnv == "production" {
-		// Production: ใช้ JSON Format สำหรับส่งไปยัง Cloud Logging (Loki, Datadog, CloudWatch)
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	} else {
-		// Development: ใช้ Text Format ให้อ่านง่ายบน Terminal
+		// ใน Dev ใช้ Debug Level เพื่อให้เห็น Log Cache Hit / Miss
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
 	slog.SetDefault(logger)
@@ -61,15 +60,29 @@ func main() {
 	}()
 
 	// ==========================================
-	// 4. Dependency Injection: Modules
+	// 4. เชื่อมต่อ Redis In-Memory Cache (ใหม่!)
+	// ==========================================
+	rdb, err := database.NewRedisClient(cfg.RedisAddr, cfg.RedisPassword)
+	if err != nil {
+		slog.Error("Failed to initialize Redis", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = rdb.Close()
+		slog.Info("🔒 Redis connection closed")
+	}()
+
+	// ==========================================
+	// 5. Dependency Injection: Modules
 	// ==========================================
 	// User Module
 	userRepo := user.NewRepository(db)
 	userService := user.NewService(userRepo, cfg.JWTSecret)
 	userHandler := user.NewHandler(userService)
 
-	// Product Module
-	productRepo := product.NewPostgresRepository(db)
+	// Product Module (หุ้มด้วย Redis Cache Decorator! แคชไว้ 5 นาที)
+	productPostgresRepo := product.NewPostgresRepository(db)
+	productRepo := product.NewCachedRepository(productPostgresRepo, rdb, 5*time.Minute)
 	productService := product.NewService(productRepo)
 	productHandler := product.NewHandler(productService)
 
@@ -79,7 +92,7 @@ func main() {
 	orderHandler := order.NewHandler(orderService)
 
 	// ==========================================
-	// 5. Router & Middleware Pipeline
+	// 6. Router & Middleware Pipeline
 	// ==========================================
 	mux := http.NewServeMux()
 
@@ -98,25 +111,26 @@ func main() {
 			"status":   "healthy",
 			"env":      cfg.AppEnv,
 			"database": "PostgreSQL (Connected)",
+			"redis":    "Redis (Connected)",
 		})
 	})
 
-	// Wrap Global Middlewares: Recovery -> Logger -> Mux
+	// Wrap Global Middlewares
 	handlerWithMiddlewares := middleware.Recovery(middleware.RequestLogger(mux))
 
 	// ==========================================
-	// 6. ตั้งค่า HTTP Server (พร้อม Timeouts ป้องกัน DoS)
+	// 7. ตั้งค่า HTTP Server
 	// ==========================================
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      handlerWithMiddlewares,
-		ReadTimeout:  10 * time.Second, // ป้องกัน Slowloris Attack
+		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
 	// ==========================================
-	// 7. รัน Server ใน Goroutine (Background)
+	// 8. รัน Server ใน Goroutine
 	// ==========================================
 	go func() {
 		slog.Info("🚀 Server started successfully", "port", cfg.Port, "env", cfg.AppEnv)
@@ -127,17 +141,14 @@ func main() {
 	}()
 
 	// ==========================================
-	// 8. ดักฟัง OS Signals สำหรับ Graceful Shutdown
+	// 9. ดักฟัง OS Signals สำหรับ Graceful Shutdown
 	// ==========================================
 	quit := make(chan os.Signal, 1)
-	// ดักจับสัญญาณ Ctrl+C (SIGINT) และ SIGTERM จาก Docker/K8s
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
-	// บล็อกรอจนกว่าจะได้รับสัญญาณปิด
 	sig := <-quit
 	slog.Info("🛑 Shutdown signal received", "signal", sig.String())
 
-	// ให้เวลา Request ที่ค้างอยู่ทำงานให้เสร็จสูงสุด 10 วินาที
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

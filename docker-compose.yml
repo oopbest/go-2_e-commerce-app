@@ -13,6 +13,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce_redis
+    restart: always
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:
