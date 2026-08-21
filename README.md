@@ -3,6 +3,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)](https://redis.io)
+[![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat&logo=docker)](https://www.docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -13,6 +14,9 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* 📖 **Interactive Swagger & OpenAPI Documentation**:
+  * Auto-generated OpenAPI 2.0 specifications via **`swaggo/swag`**.
+  * Interactive **Swagger UI** (`/swagger/index.html`) supporting live API execution and **BearerAuth** token testing.
 * 🔒 **Security & Authentication**:
   * Passwords hashed using **`bcrypt`** (salted & timing-attack resistant).
   * Stateless **JWT Authentication (HS256)** with expiration and role payload.
@@ -47,9 +51,9 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ## 🏛️ Architecture Overview
 
 ```text
-[ Client (Web / Mobile / Postman) ]
-                │
-                ▼ (HTTP Requests)
+[ Client (Web / Mobile / Swagger UI / Postman) ]
+                        │
+                        ▼ (HTTP Requests)
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. Global Middlewares (Recovery -> Logger -> Auth / RBAC)   │
 └──────────────────────────────┬──────────────────────────────┘
@@ -58,6 +62,7 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. HTTP Presentation Layer (Handler / Controllers)          │
 │    - product.Handler, user.Handler, order.Handler           │
+│    - Swagger UI (/swagger/index.html)                       │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
@@ -83,6 +88,10 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ├── cmd/
 │   └── api/
 │       └── main.go                         # Server Composition Root & Graceful Shutdown
+├── docs/                                   # Auto-Generated Swagger / OpenAPI Documentation
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
 ├── internal/
 │   ├── config/                             # 12-Factor Environment Configuration Loader
 │   │   └── config.go
@@ -120,12 +129,13 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 │       └── password_test.go
 ├── migrations/
 │   └── init.sql                            # PostgreSQL Schema & Seed Data
-├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-9)
+├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-10)
 │   ├── walkthrough-1/
 │   ├── ...
-│   └── walkthrough-9/
+│   └── walkthrough-10/
 ├── .dockerignore
 ├── .env.example
+├── .gitignore
 ├── Dockerfile                              # Multi-Stage Lean Container Build
 ├── docker-compose.yml                      # Full Stack Compose Definition
 ├── go.mod
@@ -158,7 +168,8 @@ View real-time structured logs:
 docker compose logs -f api
 ```
 
-The API is now running at `http://localhost:8080`!
+* 🌐 **API Base URL**: `http://localhost:8080`
+* 📖 **Swagger UI Documentation**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
 
 ---
 
@@ -203,10 +214,11 @@ The API is now running at `http://localhost:8080`!
 | `GET` | `/api/orders` | 🔒 User | List order history (Customer: own / Admin: all) |
 | `GET` | `/api/orders/{id}` | 🔒 User | Get order details with itemized breakdown |
 
-### 🩺 System & Health
+### 🩺 System, Health & Documentation
 | Method | Endpoint | Access Level | Description |
 | :--- | :--- | :---: | :--- |
 | `GET` | `/health` | 🌐 Public | Health check report (DB, Redis, Environment) |
+| `GET` | `/swagger/index.html` | 🌐 Public | Interactive Swagger UI API Documentation |
 
 ---
 
@@ -238,6 +250,7 @@ This project was built progressively through a hands-on, zero-to-hero curriculum
 7. [Walkthrough 7: High Performance with Redis Caching & Decorator Pattern](walkthroughs/walkthrough-7/walkthrough-7.md)
 8. [Walkthrough 8: Automated Testing, Mocking (`testify`) & httptest](walkthroughs/walkthrough-8/walkthrough-8.md)
 9. [Walkthrough 9: Multi-Stage Containerization & Full Stack Docker Compose](walkthroughs/walkthrough-9/walkthrough-9.md)
+10. [Walkthrough 10: Interactive API Documentation with Swagger & OpenAPI](walkthroughs/walkthrough-10/walkthrough-10.md)
 
 ---
 
