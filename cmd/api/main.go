@@ -8,6 +8,7 @@ import (
 
 	"github.com/oopbest/ecommerce-app/internal/database"
 	"github.com/oopbest/ecommerce-app/internal/middleware"
+	"github.com/oopbest/ecommerce-app/internal/order"
 	"github.com/oopbest/ecommerce-app/internal/product"
 	"github.com/oopbest/ecommerce-app/internal/user"
 )
@@ -31,34 +32,37 @@ func main() {
 	}
 	defer db.Close()
 
-	// JWT Secret Key (ในระบบจริงควรอ่านจาก Environment Variable)
 	jwtSecret := "my-super-secret-jwt-key-for-learning-32bytes"
 
 	// ==========================================
-	// 2. Dependency Injection: User & Auth Module
+	// 2. Dependency Injection: Modules
 	// ==========================================
+	// User & Auth Module
 	userRepo := user.NewRepository(db)
 	userService := user.NewService(userRepo, jwtSecret)
 	userHandler := user.NewHandler(userService)
 
-	// ==========================================
-	// 3. Dependency Injection: Product Module
-	// ==========================================
+	// Product Module
 	productRepo := product.NewPostgresRepository(db)
 	productService := product.NewService(productRepo)
 	productHandler := product.NewHandler(productService)
 
+	// Order Module (ใหม่!)
+	orderRepo := order.NewRepository(db)
+	orderService := order.NewService(orderRepo)
+	orderHandler := order.NewHandler(orderService)
+
 	// ==========================================
-	// 4. Middleware & Router Setup
+	// 3. Middleware & Router Setup
 	// ==========================================
 	mux := http.NewServeMux()
 
-	// Auth Middleware
 	auth := middleware.AuthMiddleware(jwtSecret)
 
-	// ลงทะเบียน Routes
+	// ลงทะเบียน Routes ของแต่ละโมดูล
 	userHandler.RegisterRoutes(mux)
 	productHandler.RegisterRoutes(mux, auth)
+	orderHandler.RegisterRoutes(mux, auth)
 
 	// Health Check Route
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -66,13 +70,13 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status":   "healthy",
-			"message":  "E-Commerce API is running (Auth & Security Enabled)",
+			"message":  "E-Commerce API is running (Full Order & Checkout Enabled)",
 			"database": "PostgreSQL (Connected)",
 		})
 	})
 
 	// ==========================================
-	// 5. Start Server
+	// 4. Start Server
 	// ==========================================
 	port := ":8080"
 	fmt.Printf("🚀 E-Commerce API server started on http://localhost%s\n", port)
