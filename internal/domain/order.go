@@ -63,6 +63,7 @@ type OrderRepository interface {
 	FindOrderByID(ctx context.Context, orderID, userID int) (*Order, error)
 	FindOrdersByUserID(ctx context.Context, userID int) ([]Order, error)
 	FindAllOrders(ctx context.Context) ([]Order, error)
+	CancelOrderAndRestoreStock(ctx context.Context, orderID int) error
 }
 
 // OrderService สัญญาการทำงานของ Business Logic สำหรับ Order

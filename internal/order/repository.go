@@ -215,3 +215,68 @@ func (r *repository) FindAllOrders(ctx context.Context) ([]domain.Order, error) 
 	}
 	return orders, nil
 }
+
+// CancelOrderAndRestoreStock ยกเลิกบิลที่หมดอายุและคืนสต็อกสินค้าใน Database Transaction
+func (r *repository) CancelOrderAndRestoreStock(ctx context.Context, orderID int) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. ตรวจสอบสถานะ Order
+	var status string
+	err = tx.QueryRowContext(ctx, "SELECT status FROM orders WHERE id = $1 FOR UPDATE", orderID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrOrderNotFound
+		}
+		return err
+	}
+
+	// ถ้า Order ไม่ได้อยู่ในสถานะ pending ไม่ต้องทำอะไร
+	if status != "pending" {
+		return nil
+	}
+
+	// 2. ปรับสถานะ Order เป็น cancelled
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'cancelled' WHERE id = $1", orderID)
+	if err != nil {
+		return err
+	}
+
+	// 3. ดึงรายการสินค้าใน Order เพื่อเตรียมคืนสต็อก
+	rows, err := tx.QueryContext(ctx, "SELECT product_id, quantity FROM order_items WHERE order_id = $1", orderID)
+	if err != nil {
+		return err
+	}
+
+	type refundItem struct {
+		productID int
+		quantity  int
+	}
+	var items []refundItem
+	for rows.Next() {
+		var item refundItem
+		if err := rows.Scan(&item.productID, &item.quantity); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	_ = rows.Close() // 👈 ปิด rows ทันทีที่อ่านเสร็จ ก่อนเริ่มรัน UPDATE
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// 4. คืนจำนวนสต็อกกลับเข้าสินค้าแต่ละรายการ
+	for _, item := range items {
+		_, err = tx.ExecContext(ctx, "UPDATE products SET stock = stock + $1 WHERE id = $2", item.quantity, item.productID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}

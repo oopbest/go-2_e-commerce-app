@@ -3,17 +3,23 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)](https://redis.io)
+[![Asynq Workers](https://img.shields.io/badge/Asynq-Task%20Queue-FF6B6B?style=flat&logo=redis)](https://github.com/hibiken/asynq)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat&logo=docker)](https://www.docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (Golang)** following **Clean Architecture**, **SOLID Principles**, and **12-Factor App methodology**.
+A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Background Worker system built in **Go (Golang)** following **Clean Architecture**, **SOLID Principles**, and **12-Factor App methodology**.
 
 ---
 
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* ⚡ **Event-Driven & Asynchronous Background Workers**:
+  * Redis-backed Distributed Task Queue powered by **`hibiken/asynq`**.
+  * **Immediate Async Jobs**: Simulated email notifications and receipts dispatched in background threads.
+  * **Delayed Scheduled Tasks**: Automated order cancellation and **stock restoration** for unpaid orders after timeout.
+  * Fault-tolerant task retries with exponential backoff and dedicated worker pools.
 * 📖 **Interactive Swagger & OpenAPI Documentation**:
   * Auto-generated OpenAPI 2.0 specifications via **`swaggo/swag`**.
   * Interactive **Swagger UI** (`/swagger/index.html`) supporting live API execution and **BearerAuth** token testing.
@@ -69,14 +75,21 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ┌─────────────────────────────────────────────────────────────┐
 │ 3. Core Business Logic (Service Layer)                      │
 │    - Business Validations, Price Calculations, Auth Logic   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (Go Interfaces)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Data Access Layer (Repositories)                         │
-│    ├── Cached Repository (Decorator: Redis 7 In-Memory)     │
-│    └── PostgreSQL Repository (Database Transactions & Locks)│
-└─────────────────────────────────────────────────────────────┘
+│    - Enqueues background tasks via worker.TaskDistributor   │
+└──────────────┬───────────────────────────────┬──────────────┘
+               │ (Go Interfaces)               │ (Task Queue)
+               ▼                               ▼
+┌──────────────────────────────┐ ┌─────────────────────────────┐
+│ 4. Data Access Layer         │ │ 5. Redis Asynq Task Queue   │
+│    - Redis Cache (Decorator) │ └─────────────┬───────────────┘
+│    - PostgreSQL Repositories │               │ (Workers Pull)
+└──────────────────────────────┘               ▼
+                                 ┌─────────────────────────────┐
+                                 │ 6. Background Worker Server │
+                                 │    - Instant Email Worker   │
+                                 │    - 1-Min Auto Cancel &    │
+                                 │      Stock Restoral Worker  │
+                                 └─────────────────────────────┘
 ```
 
 ---
@@ -86,53 +99,34 @@ A high-performance, enterprise-grade E-Commerce REST API backend built in **Go (
 ```text
 .
 ├── cmd/
-│   └── api/
-│       └── main.go                         # Server Composition Root & Graceful Shutdown
+│   ├── api/
+│   │   └── main.go                         # REST API Entry Point & Graceful Shutdown
+│   └── worker/
+│       └── main.go                         # Asynq Background Worker Server Entry Point
 ├── docs/                                   # Auto-Generated Swagger / OpenAPI Documentation
 │   ├── docs.go
 │   ├── swagger.json
 │   └── swagger.yaml
 ├── internal/
 │   ├── config/                             # 12-Factor Environment Configuration Loader
-│   │   └── config.go
 │   ├── database/                           # PostgreSQL & Redis Connection Pools
-│   │   ├── postgres.go
-│   │   └── redis.go
 │   ├── domain/                             # Core Entities, DTOs, Interfaces & Errors
-│   │   ├── order.go
-│   │   ├── product.go
-│   │   └── user.go
 │   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery)
-│   │   ├── auth.go
-│   │   ├── logger.go
-│   │   └── recovery.go
 │   ├── order/                              # Order & Checkout Module (Transactions + Locking)
-│   │   ├── handler.go
-│   │   ├── repository.go
-│   │   └── service.go
 │   ├── product/                            # Product Module (Postgres + Redis Cache Decorator)
-│   │   ├── handler.go
-│   │   ├── handler_test.go                 # HTTP Handler Unit Tests (httptest)
-│   │   ├── repository_cached.go
-│   │   ├── repository_postgres.go
-│   │   ├── service.go
-│   │   └── service_test.go                 # Service Unit Tests (testify/mock)
-│   └── user/                               # User & Authentication Module
-│       ├── handler.go
-│       ├── repository.go
-│       └── service.go
+│   ├── user/                               # User & Authentication Module
+│   └── worker/                             # Event-Driven Background Worker Module
+│       ├── distributor.go                  # Task Producer (Interface + Asynq Client)
+│       ├── processor.go                    # Task Consumer (Email & Auto-Cancel Handlers)
+│       └── task.go                         # Task Definitions & Payloads
 ├── pkg/
 │   └── security/                           # Reusable Security Packages (JWT, Bcrypt)
-│       ├── jwt.go
-│       ├── jwt_test.go
-│       ├── password.go
-│       └── password_test.go
 ├── migrations/
 │   └── init.sql                            # PostgreSQL Schema & Seed Data
-├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-10)
+├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-11)
 │   ├── walkthrough-1/
 │   ├── ...
-│   └── walkthrough-10/
+│   └── walkthrough-11/
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
@@ -179,13 +173,13 @@ docker compose logs -f api
    ```bash
    docker compose up -d postgres redis
    ```
-2. Copy environment variables:
+2. Start the Background Worker Server:
    ```bash
-   cp .env.example .env
+   go run ./cmd/worker/main.go
    ```
-3. Run the Go server:
+3. In a separate terminal, start the API Server:
    ```bash
-   go run ./cmd/api
+   go run ./cmd/api/main.go
    ```
 
 ---
@@ -207,10 +201,10 @@ docker compose logs -f api
 | `PUT` | `/api/products/{id}` | 🔒 Admin Only | Update product by ID (Invalidates Redis Cache) |
 | `DELETE` | `/api/products/{id}` | 🔒 Admin Only | Delete product by ID (Invalidates Redis Cache) |
 
-### 🛒 Orders & Checkout (Database Transactions & Locking)
+### 🛒 Orders & Checkout (Database Transactions & Asynchronous Workers)
 | Method | Endpoint | Access Level | Description |
 | :--- | :--- | :---: | :--- |
-| `POST` | `/api/orders/checkout` | 🔒 User | Checkout items with atomic stock deduction |
+| `POST` | `/api/orders/checkout` | 🔒 User | Checkout items with atomic stock deduction & async tasks |
 | `GET` | `/api/orders` | 🔒 User | List order history (Customer: own / Admin: all) |
 | `GET` | `/api/orders/{id}` | 🔒 User | Get order details with itemized breakdown |
 
@@ -251,6 +245,7 @@ This project was built progressively through a hands-on, zero-to-hero curriculum
 8. [Walkthrough 8: Automated Testing, Mocking (`testify`) & httptest](walkthroughs/walkthrough-8/walkthrough-8.md)
 9. [Walkthrough 9: Multi-Stage Containerization & Full Stack Docker Compose](walkthroughs/walkthrough-9/walkthrough-9.md)
 10. [Walkthrough 10: Interactive API Documentation with Swagger & OpenAPI](walkthroughs/walkthrough-10/walkthrough-10.md)
+11. [Walkthrough 11: Event-Driven & Asynchronous Background Workers](walkthroughs/walkthrough-11/walkthrough-11.md)
 
 ---
 

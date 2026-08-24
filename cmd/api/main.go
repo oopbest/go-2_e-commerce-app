@@ -19,6 +19,9 @@ import (
 	"github.com/oopbest/ecommerce-app/internal/product"
 	"github.com/oopbest/ecommerce-app/internal/user"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	"github.com/hibiken/asynq"
+	"github.com/oopbest/ecommerce-app/internal/worker"
 )
 
 // @title           Go E-Commerce REST API
@@ -93,19 +96,23 @@ func main() {
 	}()
 
 	// ==========================================
-	// 5. Dependency Injection: Modules
+	// 5. Dependency Injection: Modules & Task Distributor
 	// ==========================================
+	// ⚡ สร้าง Task Distributor สำหรับส่งงานเข้า Redis Queue
+	redisOpt := asynq.RedisClientOpt{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+	}
+	taskDistributor := worker.NewRedisTaskDistributor(redisOpt)
 	userRepo := user.NewRepository(db)
 	userService := user.NewService(userRepo, cfg.JWTSecret)
 	userHandler := user.NewHandler(userService)
-
 	productPostgresRepo := product.NewPostgresRepository(db)
 	productRepo := product.NewCachedRepository(productPostgresRepo, rdb, 5*time.Minute)
 	productService := product.NewService(productRepo)
 	productHandler := product.NewHandler(productService)
-
 	orderRepo := order.NewRepository(db)
-	orderService := order.NewService(orderRepo)
+	orderService := order.NewService(orderRepo, taskDistributor) // 👈 ฉีด taskDistributor เข้าไป
 	orderHandler := order.NewHandler(orderService)
 
 	// ==========================================
