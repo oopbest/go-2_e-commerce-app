@@ -81,6 +81,11 @@ func main() {
 		_ = db.Close()
 		slog.Info("🔒 Database connection pool closed")
 	}()
+	// 🗄️ รัน Database Migration อัตโนมัติ (ใหม่!)
+	if err := database.RunMigrations(db); err != nil {
+		slog.Error("Database migration failed", "error", err)
+		os.Exit(1)
+	}
 
 	// ==========================================
 	// 4. เชื่อมต่อ Redis In-Memory Cache

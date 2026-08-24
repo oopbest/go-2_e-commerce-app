@@ -65,10 +65,9 @@ services:
       POSTGRES_PASSWORD: postgrespassword
       POSTGRES_DB: ecommerce_db
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_db"]
       interval: 3s

@@ -3,6 +3,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)](https://redis.io)
+[![Migrations](https://img.shields.io/badge/golang--migrate-embed.FS-blue?style=flat&logo=postgresql)](https://github.com/golang-migrate/migrate)
 [![Asynq Workers](https://img.shields.io/badge/Asynq-Task%20Queue-FF6B6B?style=flat&logo=redis)](https://github.com/hibiken/asynq)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat&logo=docker)](https://www.docker.com)
@@ -15,6 +16,11 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* 🗄️ **Enterprise Database Versioning & Auto-Migrations**:
+  * Programmatic migrations with **`golang-migrate/migrate/v4`**.
+  * Embedded SQL files inside static Go binary using **`embed.FS`** (zero external dependencies).
+  * Safe **UP (upgrade)** and **DOWN (rollback)** schema changelogs (`schema_migrations` tracking).
+  * Zero-downtime schema evolution (e.g. `000002_add_categories_table`).
 * ⚡ **Event-Driven & Asynchronous Background Workers**:
   * Redis-backed Distributed Task Queue powered by **`hibiken/asynq`**.
   * **Immediate Async Jobs**: Simulated email notifications and receipts dispatched in background threads.
@@ -83,8 +89,8 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 │ 4. Data Access Layer         │ │ 5. Redis Asynq Task Queue   │
 │    - Redis Cache (Decorator) │ └─────────────┬───────────────┘
 │    - PostgreSQL Repositories │               │ (Workers Pull)
-└──────────────────────────────┘               ▼
-                                 ┌─────────────────────────────┐
+│    - Auto-Migrations (embed) │               ▼
+└──────────────────────────────┘ ┌─────────────────────────────┐
                                  │ 6. Background Worker Server │
                                  │    - Instant Email Worker   │
                                  │    - 1-Min Auto Cancel &    │
@@ -100,16 +106,16 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 .
 ├── cmd/
 │   ├── api/
-│   │   └── main.go                         # REST API Entry Point & Graceful Shutdown
+│   │   └── main.go                         # REST API Entry Point & Auto-Migration Trigger
 │   └── worker/
 │       └── main.go                         # Asynq Background Worker Server Entry Point
 ├── docs/                                   # Auto-Generated Swagger / OpenAPI Documentation
-│   ├── docs.go
-│   ├── swagger.json
-│   └── swagger.yaml
 ├── internal/
 │   ├── config/                             # 12-Factor Environment Configuration Loader
-│   ├── database/                           # PostgreSQL & Redis Connection Pools
+│   ├── database/                           # PostgreSQL, Redis & Auto-Migration Runner
+│   │   ├── migration.go                    # golang-migrate runner with embed.FS
+│   │   ├── postgres.go
+│   │   └── redis.go
 │   ├── domain/                             # Core Entities, DTOs, Interfaces & Errors
 │   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery)
 │   ├── order/                              # Order & Checkout Module (Transactions + Locking)
@@ -121,12 +127,16 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 │       └── task.go                         # Task Definitions & Payloads
 ├── pkg/
 │   └── security/                           # Reusable Security Packages (JWT, Bcrypt)
-├── migrations/
-│   └── init.sql                            # PostgreSQL Schema & Seed Data
-├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-11)
+├── migrations/                             # Versioned Database Migrations (Embedded via embed.FS)
+│   ├── 000001_init_schema.up.sql
+│   ├── 000001_init_schema.down.sql
+│   ├── 000002_add_categories_table.up.sql
+│   ├── 000002_add_categories_table.down.sql
+│   └── migrations.go                       # //go:embed *.sql
+├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-12)
 │   ├── walkthrough-1/
 │   ├── ...
-│   └── walkthrough-11/
+│   └── walkthrough-12/
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
@@ -146,7 +156,7 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 
 ### Option 1: Run Full Stack with Docker Compose (Recommended)
 
-Start all services (API, PostgreSQL 16, Redis 7) with a single command:
+Start all services (API, Background Worker, PostgreSQL 16, Redis 7) with a single command:
 
 ```bash
 docker compose up --build -d
@@ -159,75 +169,12 @@ docker compose ps
 
 View real-time structured logs:
 ```bash
-docker compose logs -f api
+docker compose logs -f api worker
 ```
 
 * 🌐 **API Base URL**: `http://localhost:8080`
 * 📖 **Swagger UI Documentation**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
-
----
-
-### Option 2: Run Natively on Host Machine
-
-1. Start database and cache dependencies:
-   ```bash
-   docker compose up -d postgres redis
-   ```
-2. Start the Background Worker Server:
-   ```bash
-   go run ./cmd/worker/main.go
-   ```
-3. In a separate terminal, start the API Server:
-   ```bash
-   go run ./cmd/api/main.go
-   ```
-
----
-
-## 📡 API Endpoints Reference
-
-### 🔐 Authentication & Users
-| Method | Endpoint | Access Level | Description |
-| :--- | :--- | :---: | :--- |
-| `POST` | `/api/auth/register` | 🌐 Public | Register new user (Default Role: `customer` or `admin`) |
-| `POST` | `/api/auth/login` | 🌐 Public | Authenticate user and receive JWT Bearer token |
-
-### 📦 Products Catalog (Cached in Redis)
-| Method | Endpoint | Access Level | Description |
-| :--- | :--- | :---: | :--- |
-| `GET` | `/api/products` | 🌐 Public | List all products (Cache-Aside, 5m TTL) |
-| `GET` | `/api/products/{id}` | 🌐 Public | Get product details by ID |
-| `POST` | `/api/products` | 🔒 Admin Only | Create new product (Invalidates Redis Cache) |
-| `PUT` | `/api/products/{id}` | 🔒 Admin Only | Update product by ID (Invalidates Redis Cache) |
-| `DELETE` | `/api/products/{id}` | 🔒 Admin Only | Delete product by ID (Invalidates Redis Cache) |
-
-### 🛒 Orders & Checkout (Database Transactions & Asynchronous Workers)
-| Method | Endpoint | Access Level | Description |
-| :--- | :--- | :---: | :--- |
-| `POST` | `/api/orders/checkout` | 🔒 User | Checkout items with atomic stock deduction & async tasks |
-| `GET` | `/api/orders` | 🔒 User | List order history (Customer: own / Admin: all) |
-| `GET` | `/api/orders/{id}` | 🔒 User | Get order details with itemized breakdown |
-
-### 🩺 System, Health & Documentation
-| Method | Endpoint | Access Level | Description |
-| :--- | :--- | :---: | :--- |
-| `GET` | `/health` | 🌐 Public | Health check report (DB, Redis, Environment) |
-| `GET` | `/swagger/index.html` | 🌐 Public | Interactive Swagger UI API Documentation |
-
----
-
-## 🧪 Testing & Code Coverage
-
-Run the full automated test suite with verbose output:
-```bash
-go test -v ./...
-```
-
-Generate and view interactive HTML code coverage in your browser:
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
+* 🗄️ **PostgreSQL Port (Host)**: `localhost:15432`
 
 ---
 
@@ -246,6 +193,7 @@ This project was built progressively through a hands-on, zero-to-hero curriculum
 9. [Walkthrough 9: Multi-Stage Containerization & Full Stack Docker Compose](walkthroughs/walkthrough-9/walkthrough-9.md)
 10. [Walkthrough 10: Interactive API Documentation with Swagger & OpenAPI](walkthroughs/walkthrough-10/walkthrough-10.md)
 11. [Walkthrough 11: Event-Driven & Asynchronous Background Workers](walkthroughs/walkthrough-11/walkthrough-11.md)
+12. [Walkthrough 12: Enterprise Database Migrations & Versioning](walkthroughs/walkthrough-12/walkthrough-12.md)
 
 ---
 

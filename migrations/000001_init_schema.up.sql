@@ -8,11 +8,15 @@ CREATE TABLE IF NOT EXISTS products (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- ใส่ข้อมูลเริ่มต้น (Seed Data)
-INSERT INTO products (name, description, price, stock) VALUES
-('Mechanical Keyboard', 'RGB Hot-swappable', 2590.00, 15),
-('Wireless Mouse', 'Ergonomic 2.4GHz', 1290.00, 30),
-('Gaming Headset', '7.1 Surround Sound', 1990.00, 20);
+-- ใส่ข้อมูลเริ่มต้น (Seed Data โดยระบุ ID ชัดเจน)
+INSERT INTO products (id, name, description, price, stock) VALUES
+(1, 'Mechanical Keyboard', 'RGB Hot-swappable', 2590.00, 15),
+(2, 'Wireless Mouse', 'Ergonomic 2.4GHz', 1290.00, 30),
+(3, 'Gaming Headset', '7.1 Surround Sound', 1990.00, 20)
+ON CONFLICT (id) DO NOTHING;
+
+-- รีเซ็ตค่า Sequence ของ ID ให้ตรงกับค่าล่าสุด
+SELECT setval('products_id_seq', (SELECT MAX(id) FROM products));
 
 -- สร้างตาราง users
 CREATE TABLE IF NOT EXISTS users (
@@ -38,7 +42,6 @@ CREATE TABLE IF NOT EXISTS order_items (
     order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id INT NOT NULL REFERENCES products(id),
     quantity INT NOT NULL CHECK (quantity > 0),
-    price NUMERIC(10, 2) NOT NULL, -- บันทึกราคา ณ เวลาที่สั่งซื้อ
+    price NUMERIC(10, 2) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
