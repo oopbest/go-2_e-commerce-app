@@ -22,6 +22,8 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/oopbest/ecommerce-app/internal/worker"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // @title           Go E-Commerce REST API
@@ -135,6 +137,9 @@ func main() {
 	// 📖 Swagger UI Endpoint (ใหม่!)
 	mux.HandleFunc("GET /swagger/", httpSwagger.WrapHandler)
 
+	// 📊 Prometheus Metrics Endpoint
+	mux.Handle("GET /metrics", promhttp.Handler())
+
 	// Health Check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -147,8 +152,12 @@ func main() {
 		})
 	})
 
-	// Wrap Global Middlewares
-	handlerWithMiddlewares := middleware.Recovery(middleware.RequestLogger(mux))
+	// Wrap Global Middlewares: Recovery -> Metrics -> Logger -> Router
+	handlerWithMiddlewares := middleware.Recovery(
+		middleware.MetricsMiddleware(
+			middleware.RequestLogger(mux),
+		),
+	)
 
 	// ==========================================
 	// 7. ตั้งค่า HTTP Server

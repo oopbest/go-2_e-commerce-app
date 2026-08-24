@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s # ดึงข้อมูล Metrics ทุกๆ 5 วินาที
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "ecommerce-api"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["api:8080"] # ยิงไปดึง Metrics จาก Service api ใน Docker Network

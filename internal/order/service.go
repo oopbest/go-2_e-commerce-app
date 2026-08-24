@@ -7,6 +7,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/oopbest/ecommerce-app/internal/domain"
+	"github.com/oopbest/ecommerce-app/internal/metrics"
 	"github.com/oopbest/ecommerce-app/internal/middleware"
 	"github.com/oopbest/ecommerce-app/internal/worker"
 	"github.com/oopbest/ecommerce-app/pkg/security"
@@ -51,6 +52,10 @@ func (s *service) Checkout(ctx context.Context, userID int, input domain.Checkou
 	if err != nil {
 		return nil, err
 	}
+
+	//บันทึก Business Metrics ให้ Prometheus
+	metrics.OrdersTotal.WithLabelValues("success").Inc()
+	metrics.RevenueTotal.Add(createdOrder.TotalAmount)
 
 	// ==========================================
 	// 🚀 Asynchronous Tasks: ส่งงานเข้า Redis Queue ทันทีหลัง Commit

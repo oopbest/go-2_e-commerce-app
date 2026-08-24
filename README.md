@@ -3,19 +3,27 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)](https://redis.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C?style=flat&logo=prometheus)](http://localhost:9090)
+[![Grafana](https://img.shields.io/badge/Grafana-Dashboard-F46800?style=flat&logo=grafana)](http://localhost:3000)
 [![Migrations](https://img.shields.io/badge/golang--migrate-embed.FS-blue?style=flat&logo=postgresql)](https://github.com/golang-migrate/migrate)
 [![Asynq Workers](https://img.shields.io/badge/Asynq-Task%20Queue-FF6B6B?style=flat&logo=redis)](https://github.com/hibiken/asynq)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat&logo=docker)](https://www.docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Background Worker system built in **Go (Golang)** following **Clean Architecture**, **SOLID Principles**, and **12-Factor App methodology**.
+A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Background Worker, and Cloud Observability system built in **Go (Golang)** following **Clean Architecture**, **SOLID Principles**, and **12-Factor App methodology**.
 
 ---
 
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* 📊 **Cloud Observability & Real-Time Metrics (Prometheus + Grafana)**:
+  * Prometheus metrics instrumentation using **`prometheus/client_golang`**.
+  * Custom **HTTP Metrics Middleware**: RPS counter, in-flight requests gauge, and **P95/P99 latency histogram**.
+  * **Cardinality Protection**: Automated URL path normalization (e.g. `/api/products/{id}`).
+  * **Business Analytics Metrics**: Real-time order placement counters and total sales revenue in THB.
+  * Live **Grafana Dashboards** visualizing application health and Goroutine allocation.
 * 🗄️ **Enterprise Database Versioning & Auto-Migrations**:
   * Programmatic migrations with **`golang-migrate/migrate/v4`**.
   * Embedded SQL files inside static Go binary using **`embed.FS`** (zero external dependencies).
@@ -56,7 +64,7 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 * 🐳 **Cloud & Container Ready**:
   * **Multi-Stage Dockerfile** producing an ultra-lean **~8 MB** static binary container (`CGO_ENABLED=0`, `-ldflags="-w -s"`).
   * Runs with an unprivileged non-root user (`appuser`).
-  * Full-stack orchestration via **Docker Compose** with health checks (`pg_isready`, `redis-cli ping`).
+  * 6-Service orchestration via **Docker Compose** with health checks (`pg_isready`, `redis-cli ping`).
 
 ---
 
@@ -67,7 +75,8 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
                         │
                         ▼ (HTTP Requests)
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. Global Middlewares (Recovery -> Logger -> Auth / RBAC)   │
+│ 1. Global Middlewares                                       │
+│    - RecoveryMiddleware -> MetricsMiddleware -> Logger      │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
@@ -75,27 +84,28 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 │ 2. HTTP Presentation Layer (Handler / Controllers)          │
 │    - product.Handler, user.Handler, order.Handler           │
 │    - Swagger UI (/swagger/index.html)                       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Core Business Logic (Service Layer)                      │
-│    - Business Validations, Price Calculations, Auth Logic   │
-│    - Enqueues background tasks via worker.TaskDistributor   │
+│    - Prometheus Metrics Endpoint (/metrics)                 │
 └──────────────┬───────────────────────────────┬──────────────┘
-               │ (Go Interfaces)               │ (Task Queue)
-               ▼                               ▼
+               │                               │
+               ▼                               ▼ (Scrapes every 5s)
 ┌──────────────────────────────┐ ┌─────────────────────────────┐
-│ 4. Data Access Layer         │ │ 5. Redis Asynq Task Queue   │
-│    - Redis Cache (Decorator) │ └─────────────┬───────────────┘
-│    - PostgreSQL Repositories │               │ (Workers Pull)
-│    - Auto-Migrations (embed) │               ▼
-└──────────────────────────────┘ ┌─────────────────────────────┐
-                                 │ 6. Background Worker Server │
-                                 │    - Instant Email Worker   │
-                                 │    - 1-Min Auto Cancel &    │
-                                 │      Stock Restoral Worker  │
-                                 └─────────────────────────────┘
+│ 3. Core Business Logic       │ │ 4. Prometheus Server (9090) │
+│    - Order, Product, User    │ └─────────────┬───────────────┘
+│    - Auto-Migrations (embed) │               │ (PromQL)
+└──────────────┬───────────────┘               ▼
+               │ (Tasks)         ┌─────────────────────────────┐
+               ▼                 │ 5. Grafana Dashboard (3000) │
+┌──────────────────────────────┐ └─────────────────────────────┘
+│ 6. Redis Task Queue (asynq)  │
+└──────────────┬───────────────┘
+               │ (Workers Pull)
+               ▼
+┌──────────────────────────────┐
+│ 7. Background Worker Server  │
+│    - Instant Email Worker    │
+│    - 1-Min Auto-Cancel &     │
+│      Stock Restoral Worker   │
+└──────────────────────────────┘
 ```
 
 ---
@@ -106,42 +116,35 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 .
 ├── cmd/
 │   ├── api/
-│   │   └── main.go                         # REST API Entry Point & Auto-Migration Trigger
+│   │   └── main.go                         # REST API Entry Point, Metrics & Migrations
 │   └── worker/
 │       └── main.go                         # Asynq Background Worker Server Entry Point
+├── deploy/
+│   └── prometheus/
+│       └── prometheus.yml                  # Prometheus Scrape Target Configuration
 ├── docs/                                   # Auto-Generated Swagger / OpenAPI Documentation
 ├── internal/
 │   ├── config/                             # 12-Factor Environment Configuration Loader
 │   ├── database/                           # PostgreSQL, Redis & Auto-Migration Runner
-│   │   ├── migration.go                    # golang-migrate runner with embed.FS
-│   │   ├── postgres.go
-│   │   └── redis.go
 │   ├── domain/                             # Core Entities, DTOs, Interfaces & Errors
-│   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery)
+│   ├── metrics/                            # Prometheus Metric Definitions (RPS, Latency, Business)
+│   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery, Metrics)
 │   ├── order/                              # Order & Checkout Module (Transactions + Locking)
 │   ├── product/                            # Product Module (Postgres + Redis Cache Decorator)
 │   ├── user/                               # User & Authentication Module
 │   └── worker/                             # Event-Driven Background Worker Module
-│       ├── distributor.go                  # Task Producer (Interface + Asynq Client)
-│       ├── processor.go                    # Task Consumer (Email & Auto-Cancel Handlers)
-│       └── task.go                         # Task Definitions & Payloads
 ├── pkg/
 │   └── security/                           # Reusable Security Packages (JWT, Bcrypt)
 ├── migrations/                             # Versioned Database Migrations (Embedded via embed.FS)
-│   ├── 000001_init_schema.up.sql
-│   ├── 000001_init_schema.down.sql
-│   ├── 000002_add_categories_table.up.sql
-│   ├── 000002_add_categories_table.down.sql
-│   └── migrations.go                       # //go:embed *.sql
-├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-12)
+├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-13)
 │   ├── walkthrough-1/
 │   ├── ...
-│   └── walkthrough-12/
+│   └── walkthrough-13/
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
 ├── Dockerfile                              # Multi-Stage Lean Container Build
-├── docker-compose.yml                      # Full Stack Compose Definition
+├── docker-compose.yml                      # Full Stack (API, Worker, Postgres, Redis, Prometheus, Grafana)
 ├── go.mod
 └── go.sum
 ```
@@ -154,9 +157,9 @@ A high-performance, enterprise-grade E-Commerce REST API and Event-Driven Backgr
 * [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
 * [Go 1.24+](https://golang.org/dl/) (optional, if running natively).
 
-### Option 1: Run Full Stack with Docker Compose (Recommended)
+### Option 1: Run Full 6-Container Stack with Docker Compose (Recommended)
 
-Start all services (API, Background Worker, PostgreSQL 16, Redis 7) with a single command:
+Start all services with a single command:
 
 ```bash
 docker compose up --build -d
@@ -167,13 +170,10 @@ Check container status and health:
 docker compose ps
 ```
 
-View real-time structured logs:
-```bash
-docker compose logs -f api worker
-```
-
 * 🌐 **API Base URL**: `http://localhost:8080`
 * 📖 **Swagger UI Documentation**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
+* 📊 **Prometheus Server**: [http://localhost:9090](http://localhost:9090)
+* 📈 **Grafana Live Dashboard**: [http://localhost:3000](http://localhost:3000) *(User: `admin` / Password: `admin`)*
 * 🗄️ **PostgreSQL Port (Host)**: `localhost:15432`
 
 ---
@@ -194,6 +194,7 @@ This project was built progressively through a hands-on, zero-to-hero curriculum
 10. [Walkthrough 10: Interactive API Documentation with Swagger & OpenAPI](walkthroughs/walkthrough-10/walkthrough-10.md)
 11. [Walkthrough 11: Event-Driven & Asynchronous Background Workers](walkthroughs/walkthrough-11/walkthrough-11.md)
 12. [Walkthrough 12: Enterprise Database Migrations & Versioning](walkthroughs/walkthrough-12/walkthrough-12.md)
+13. [Walkthrough 13: Cloud Observability & Real-Time Metrics](walkthroughs/walkthrough-13/walkthrough-13.md)
 
 ---
 

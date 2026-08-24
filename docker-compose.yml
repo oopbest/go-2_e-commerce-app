@@ -89,5 +89,40 @@ services:
       timeout: 3s
       retries: 5
 
+  # ==========================================
+  # 5. Prometheus Monitoring Server
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ecommerce_prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - api
+
+  # ==========================================
+  # 6. Grafana Live Visualization Dashboard
+  # ==========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ecommerce_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
