@@ -20,6 +20,7 @@ COPY . .
 # - GOOS=linux: คอมไพล์สำหรับระบบ Linux
 # - -ldflags="-w -s": ลบ Debug Information และ DWARF Symbol Tables ทำให้ขนาด Binary เล็กลง 30-40%!
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/server ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/worker ./cmd/worker
 
 # ==========================================
 # Stage 2: Final Production Stage (ขนาดจิ๋ว < 20MB)
@@ -36,6 +37,7 @@ RUN adduser -D -g '' appuser
 
 # คัดลอกเฉพาะไฟล์ Binary ที่คอมไพล์เสร็จแล้วมาจาก Stage 1
 COPY --from=builder /app/bin/server /app/server
+COPY --from=builder /app/bin/worker /app/worker
 
 # ปรับสิทธิ์การเข้าถึงให้เป็นของ appuser
 USER appuser

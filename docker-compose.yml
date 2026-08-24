@@ -27,9 +27,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+  # ==========================================
+  # 2. Go Asynchronous Worker Service (ใหม่!)
+  # ==========================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecommerce_worker
+    restart: always
+    entrypoint: ["/app/worker"]
+    environment:
+      - APP_ENV=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgrespassword
+      - DB_NAME=ecommerce_db
+      - DB_SSLMODE=disable
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # ==========================================
-  # 2. PostgreSQL Database Service
+  # 3. PostgreSQL Database Service
   # ==========================================
   postgres:
     image: postgres:16-alpine
@@ -51,7 +76,7 @@ services:
       retries: 5
 
   # ==========================================
-  # 3. Redis In-Memory Cache Service
+  # 4. Redis In-Memory Cache Service
   # ==========================================
   redis:
     image: redis:7-alpine
