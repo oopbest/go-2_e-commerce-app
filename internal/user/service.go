@@ -33,12 +33,6 @@ func (s *service) Register(input domain.RegisterInput) (*domain.AuthResponse, er
 		return nil, errors.New("password must be at least 6 characters")
 	}
 
-	// กำหนด Role เริ่มต้นหากไม่ได้ระบุ
-	role := strings.ToLower(strings.TrimSpace(input.Role))
-	if role != "admin" {
-		role = "customer"
-	}
-
 	// 2. Hash Password ด้วย bcrypt
 	hashedPassword, err := security.HashPassword(input.Password)
 	if err != nil {
@@ -49,7 +43,7 @@ func (s *service) Register(input domain.RegisterInput) (*domain.AuthResponse, er
 	newUser := &domain.User{
 		Email:        input.Email,
 		PasswordHash: hashedPassword,
-		Role:         role,
+		Role:         domain.RoleCustomer,
 	}
 
 	createdUser, err := s.repo.Create(newUser)

@@ -89,7 +89,7 @@ func (h *Handler) handleGetOrders(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	// ถ้าเป็น Admin ให้ดึงคำสั่งซื้อทั้งหมดในระบบ ถ้าเป็น Customer ให้ดึงเฉพาะของตนเอง
-	if claims.Role == "admin" {
+	if claims.Role == domain.RoleAdmin {
 		orders, err = h.service.GetAllOrders(r.Context())
 	} else {
 		orders, err = h.service.GetUserOrders(r.Context(), claims.UserID)

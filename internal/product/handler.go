@@ -28,9 +28,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc)
 	mux.HandleFunc("GET /api/products", h.handleGetProducts)
 	mux.HandleFunc("GET /api/products/{id}", h.handleGetProductByID)
 	// Protected Endpoints (ต้องมี Token และต้องเป็น Admin เท่านั้น)
-	mux.HandleFunc("POST /api/products", auth(middleware.RequireRole("admin", h.handleCreateProduct)))
-	mux.HandleFunc("PUT /api/products/{id}", auth(middleware.RequireRole("admin", h.handleUpdateProduct)))
-	mux.HandleFunc("DELETE /api/products/{id}", auth(middleware.RequireRole("admin", h.handleDeleteProduct)))
+	mux.HandleFunc("POST /api/products", auth(middleware.RequireRole(domain.RoleAdmin, h.handleCreateProduct)))
+	mux.HandleFunc("PUT /api/products/{id}", auth(middleware.RequireRole(domain.RoleAdmin, h.handleUpdateProduct)))
+	mux.HandleFunc("DELETE /api/products/{id}", auth(middleware.RequireRole(domain.RoleAdmin, h.handleDeleteProduct)))
 }
 
 // handleGetProducts godoc

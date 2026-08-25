@@ -98,7 +98,7 @@ func (s *service) GetOrderByID(ctx context.Context, orderID, userID int, userRol
 
 	// ถ้าเป็น Admin ให้ดูบิลของใครก็ได้ (ส่ง userID = 0)
 	queryUserID := userID
-	if userRole == "admin" {
+	if userRole == domain.RoleAdmin {
 		queryUserID = 0
 	}
 

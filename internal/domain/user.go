@@ -20,6 +20,12 @@ var (
 // 2. Entities & DTOs
 // ==========================================
 
+// Role สิทธิ์ของผู้ใช้งาน
+const (
+	RoleCustomer = "customer"
+	RoleAdmin    = "admin"
+)
+
 // User โครงสร้างข้อมูลผู้ใช้งาน
 type User struct {
 	ID           int       `json:"id"`
@@ -33,7 +39,6 @@ type User struct {
 type RegisterInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Role     string `json:"role"` // customer หรือ admin
 }
 
 // LoginInput ข้อมูลที่รับเข้ามาตอนเข้าสู่ระบบ
