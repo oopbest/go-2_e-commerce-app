@@ -27,7 +27,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 // handleRegister godoc
 // @Summary      Register a new user
-// @Description  Register a new customer or admin user and return JWT token
+// @Description  Register a new customer account and return a JWT token
 // @Tags         Auth
 // @Accept       json
 // @Produce      json

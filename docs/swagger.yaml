@@ -97,9 +97,6 @@ definitions:
         type: string
       password:
         type: string
-      role:
-        description: customer หรือ admin
-        type: string
     type: object
   domain.UpdateProductInput:
     properties:
@@ -175,7 +172,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Register a new customer or admin user and return JWT token
+      description: Register a new customer account and return a JWT token
       parameters:
       - description: User Registration Data
         in: body

@@ -77,7 +77,7 @@ const docTemplate = `{
         },
         "/api/auth/register": {
             "post": {
-                "description": "Register a new customer or admin user and return JWT token",
+                "description": "Register a new customer account and return a JWT token",
                 "consumes": [
                     "application/json"
                 ],
@@ -715,10 +715,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
-                    "type": "string"
-                },
-                "role": {
-                    "description": "customer หรือ admin",
                     "type": "string"
                 }
             }
