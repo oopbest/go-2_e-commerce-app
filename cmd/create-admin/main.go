@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/mail"
 	"os"
-	"strings"
 
 	"github.com/oopbest/ecommerce-app/internal/config"
 	"github.com/oopbest/ecommerce-app/internal/database"
@@ -27,7 +26,7 @@ func run() error {
 
 	email := flag.String("email", "", "admin email address")
 	flag.Parse()
-	normalizedEmail := strings.ToLower(strings.TrimSpace(*email))
+	normalizedEmail := domain.NormalizeEmail(*email)
 	if err := validateEmail(normalizedEmail); err != nil {
 		return err
 	}

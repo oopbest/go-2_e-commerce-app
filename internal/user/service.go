@@ -25,7 +25,7 @@ func NewService(repo domain.UserRepository, jwtSecret string) domain.UserService
 // Register สมัครสมาชิกใหม่
 func (s *service) Register(input domain.RegisterInput) (*domain.AuthResponse, error) {
 	// 1. Validation
-	input.Email = strings.TrimSpace(input.Email)
+	input.Email = domain.NormalizeEmail(input.Email)
 	if input.Email == "" || !strings.Contains(input.Email, "@") {
 		return nil, errors.New("a valid email is required")
 	}
@@ -66,7 +66,7 @@ func (s *service) Register(input domain.RegisterInput) (*domain.AuthResponse, er
 // Login เข้าสู่ระบบ
 func (s *service) Login(input domain.LoginInput) (*domain.AuthResponse, error) {
 	// 1. Validation
-	input.Email = strings.TrimSpace(input.Email)
+	input.Email = domain.NormalizeEmail(input.Email)
 	if input.Email == "" || input.Password == "" {
 		return nil, errors.New("email and password are required")
 	}
