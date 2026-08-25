@@ -39,3 +39,4 @@ coverage.html
 # ==========================================
 .DS_Store
 Thumbs.db
+frontend/
