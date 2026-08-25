@@ -161,10 +161,12 @@ func main() {
 		})
 	})
 
-	// Wrap Global Middlewares: Recovery -> Metrics -> Logger -> Router
-	handlerWithMiddlewares := middleware.Recovery(
-		middleware.MetricsMiddleware(
-			middleware.RequestLogger(mux),
+	// Wrap Global Middlewares: CORS -> Recovery -> Metrics -> Logger -> Router
+	handlerWithMiddlewares := middleware.CORSMiddleware(
+		middleware.Recovery(
+			middleware.MetricsMiddleware(
+				middleware.RequestLogger(mux),
+			),
 		),
 	)
 

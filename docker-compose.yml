@@ -4,7 +4,7 @@ services:
   # ==========================================
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: ecommerce_api
     restart: always
@@ -32,7 +32,7 @@ services:
   # ==========================================
   worker:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: ecommerce_worker
     restart: always
@@ -99,7 +99,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./backend/deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     depends_on:
       - api
