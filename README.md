@@ -18,6 +18,12 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* 🔒 **Security & Authentication**:
+  * 👑 **Secure Admin Creation CLI (`cmd/create-admin`)**: Out-of-band admin management tool with terminal password masking (`golang.org/x/term`), RFC 5322 email validation, 12+ character enforcement, and **Privilege Escalation prevention** (public registration restricted to `customer`).
+  * Passwords hashed using **`bcrypt`** (salted & timing-attack resistant).
+  * Stateless **JWT Authentication (HS256)** with expiration and role payload.
+  * Role-Based Access Control (**RBAC**) middleware (`admin` vs `customer`) with centralized domain constants.
+  * Sensitive data sanitization using struct tag `json:"-"`.
 * 📊 **Cloud Observability & Real-Time Metrics (Prometheus + Grafana)**:
   * Prometheus metrics instrumentation using **`prometheus/client_golang`**.
   * Custom **HTTP Metrics Middleware**: RPS counter, in-flight requests gauge, and **P95/P99 latency histogram**.
@@ -37,11 +43,6 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 * 📖 **Interactive Swagger & OpenAPI Documentation**:
   * Auto-generated OpenAPI 2.0 specifications via **`swaggo/swag`**.
   * Interactive **Swagger UI** (`/swagger/index.html`) supporting live API execution and **BearerAuth** token testing.
-* 🔒 **Security & Authentication**:
-  * Passwords hashed using **`bcrypt`** (salted & timing-attack resistant).
-  * Stateless **JWT Authentication (HS256)** with expiration and role payload.
-  * Role-Based Access Control (**RBAC**) middleware (`admin` vs `customer`).
-  * Sensitive data sanitization using struct tag `json:"-"`.
 * 🛒 **Shopping Cart & Checkout System**:
   * Atomic multi-table **Database Transactions (`db.BeginTx`)** ensuring all-or-nothing order creation.
   * 🛡️ **Pessimistic Row Locking (`SELECT ... FOR UPDATE`)** to prevent race conditions and overselling during high-concurrency checkout.
@@ -117,6 +118,9 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ├── cmd/
 │   ├── api/
 │   │   └── main.go                         # REST API Entry Point, Metrics & Migrations
+│   ├── create-admin/                       # Secure Admin Creation CLI Tool
+│   │   ├── main.go
+│   │   └── main_test.go
 │   └── worker/
 │       └── main.go                         # Asynq Background Worker Server Entry Point
 ├── deploy/
@@ -126,7 +130,10 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ├── internal/
 │   ├── config/                             # 12-Factor Environment Configuration Loader
 │   ├── database/                           # PostgreSQL, Redis & Auto-Migration Runner
-│   ├── domain/                             # Core Entities, DTOs, Interfaces & Errors
+│   │   ├── migration.go                    # golang-migrate runner with embed.FS
+│   │   ├── postgres.go
+│   │   └── redis.go
+│   ├── domain/                             # Core Entities, DTOs, Role Constants & Interfaces
 │   ├── metrics/                            # Prometheus Metric Definitions (RPS, Latency, Business)
 │   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery, Metrics)
 │   ├── order/                              # Order & Checkout Module (Transactions + Locking)
@@ -137,9 +144,6 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 │   └── security/                           # Reusable Security Packages (JWT, Bcrypt)
 ├── migrations/                             # Versioned Database Migrations (Embedded via embed.FS)
 ├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-13)
-│   ├── walkthrough-1/
-│   ├── ...
-│   └── walkthrough-13/
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
@@ -175,6 +179,66 @@ docker compose ps
 * 📊 **Prometheus Server**: [http://localhost:9090](http://localhost:9090)
 * 📈 **Grafana Live Dashboard**: [http://localhost:3000](http://localhost:3000) *(User: `admin` / Password: `admin`)*
 * 🗄️ **PostgreSQL Port (Host)**: `localhost:15432`
+
+---
+
+### 👑 Creating an Administrator Account (CLI)
+
+Public registration (`POST /api/auth/register`) strictly registers users with the `customer` role to prevent privilege escalation. To create an `admin` user with elevated access (for product management), run the interactive CLI tool with hidden password input:
+
+```bash
+go run ./cmd/create-admin/main.go --email admin@example.com
+```
+
+*(You will be prompted to enter and confirm a password with a minimum of 12 characters)*.
+
+---
+
+## 📡 API Endpoints Reference
+
+### 🔐 Authentication & Users
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/auth/register` | 🌐 Public | Register new customer account (Role: `customer`) |
+| `POST` | `/api/auth/login` | 🌐 Public | Authenticate user and receive JWT Bearer token |
+
+### 📦 Products Catalog (Cached in Redis)
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/products` | 🌐 Public | List all products (Cache-Aside, 5m TTL) |
+| `GET` | `/api/products/{id}` | 🌐 Public | Get product details by ID |
+| `POST` | `/api/products` | 🔒 Admin Only | Create new product (Invalidates Redis Cache) |
+| `PUT` | `/api/products/{id}` | 🔒 Admin Only | Update product by ID (Invalidates Redis Cache) |
+| `DELETE` | `/api/products/{id}` | 🔒 Admin Only | Delete product by ID (Invalidates Redis Cache) |
+
+### 🛒 Orders & Checkout (Database Transactions & Asynchronous Workers)
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/orders/checkout` | 🔒 User | Checkout items with atomic stock deduction & async tasks |
+| `GET` | `/api/orders` | 🔒 User | List order history (Customer: own / Admin: all) |
+| `GET` | `/api/orders/{id}` | 🔒 User | Get order details with itemized breakdown |
+
+### 🩺 System, Health & Observability
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/health` | 🌐 Public | Health check report (DB, Redis, Environment) |
+| `GET` | `/metrics` | 🌐 Public | Prometheus raw metrics scraping endpoint |
+| `GET` | `/swagger/index.html` | 🌐 Public | Interactive Swagger UI API Documentation |
+
+---
+
+## 🧪 Testing & Code Coverage
+
+Run the full automated test suite with verbose output:
+```bash
+go test -v ./...
+```
+
+Generate and view interactive HTML code coverage in your browser:
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
 
 ---
 
