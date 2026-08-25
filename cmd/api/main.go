@@ -24,6 +24,8 @@ import (
 	"github.com/oopbest/ecommerce-app/internal/worker"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/oopbest/ecommerce-app/internal/payment"
 )
 
 // @title           Go E-Commerce REST API
@@ -122,6 +124,12 @@ func main() {
 	orderService := order.NewService(orderRepo, taskDistributor) // 👈 ฉีด taskDistributor เข้าไป
 	orderHandler := order.NewHandler(orderService)
 
+	// 💳 สร้าง Payment Module (ใหม่!)
+	paymentRepo := payment.NewRepository(db)
+	paymentGateway := payment.NewMockGateway()
+	paymentService := payment.NewService(paymentRepo, orderRepo, paymentGateway)
+	paymentHandler := payment.NewHandler(paymentService)
+
 	// ==========================================
 	// 6. Router & Middleware Pipeline
 	// ==========================================
@@ -133,6 +141,7 @@ func main() {
 	userHandler.RegisterRoutes(mux)
 	productHandler.RegisterRoutes(mux, auth)
 	orderHandler.RegisterRoutes(mux, auth)
+	paymentHandler.RegisterRoutes(mux, auth)
 
 	// 📖 Swagger UI Endpoint (ใหม่!)
 	mux.HandleFunc("GET /swagger/", httpSwagger.WrapHandler)

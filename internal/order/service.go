@@ -83,7 +83,7 @@ func (s *service) Checkout(ctx context.Context, userID int, input domain.Checkou
 		_ = s.distributor.DistributeTaskOrderTimeoutCheck(
 			ctx,
 			timeoutPayload,
-			asynq.ProcessIn(1*time.Minute), // หน่วงเวลา 1 นาที
+			asynq.ProcessIn(5*time.Minute), // หน่วงเวลา 5 นาที
 		)
 	}
 

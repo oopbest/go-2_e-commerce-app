@@ -282,6 +282,176 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/payments/confirm": {
+            "post": {
+                "description": "จำลองการยืนยันการจ่ายเงินสำเร็จ (เปลี่ยน orders.status เป็น 'paid' และบันทึกใบเสร็จ)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Confirm Payment / Webhook (ยืนยันการชำระเงิน)",
+                "parameters": [
+                    {
+                        "description": "Transaction confirmation data from Gateway",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.ConfirmPaymentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.Payment"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload, status, or amount mismatch",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payments/intent": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "สร้าง Payment Intent (เช่น PromptPay QR Code หรือ URL สำหรับบัตรเครดิต) ตาม Order ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Create Payment Intent (ขอรับช่องทางชำระเงิน)",
+                "parameters": [
+                    {
+                        "description": "Order ID and Payment Method (credit_card, promptpay, truemoney)",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.CreatePaymentIntentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/domain.PaymentIntentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or order status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payments/orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "ดึงข้อมูลประวัติการชำระเงินตาม Order ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Get Payment Receipt (ดูใบเสร็จการชำระเงิน)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.Payment"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Payment record or order not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/products": {
             "get": {
                 "description": "Retrieve a list of all products (Cached in Redis)",
@@ -602,6 +772,35 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.ConfirmPaymentInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "transaction_ref": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.CreatePaymentIntentInput": {
+            "type": "object",
+            "properties": {
+                "order_id": {
+                    "type": "integer"
+                },
+                "payment_method": {
+                    "description": "credit_card, promptpay, truemoney",
+                    "type": "string"
+                }
+            }
+        },
         "domain.CreateProductInput": {
             "type": "object",
             "properties": {
@@ -682,6 +881,60 @@ const docTemplate = `{
                 },
                 "quantity": {
                     "type": "integer"
+                }
+            }
+        },
+        "domain.Payment": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "paid_at": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "transaction_ref": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.PaymentIntentResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "payment_url": {
+                    "description": "สำหรับบัตรเครดิต",
+                    "type": "string"
+                },
+                "qr_code_data": {
+                    "description": "สำหรับ PromptPay",
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "transaction_ref": {
+                    "type": "string"
                 }
             }
         },

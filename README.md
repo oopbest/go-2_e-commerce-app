@@ -5,6 +5,7 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)](https://redis.io)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C?style=flat&logo=prometheus)](http://localhost:9090)
 [![Grafana](https://img.shields.io/badge/Grafana-Dashboard-F46800?style=flat&logo=grafana)](http://localhost:3000)
+[![Payments](https://img.shields.io/badge/Payments-Mock%20Gateway-4CAF50?style=flat&logo=stripe)](http://localhost:8080/swagger/index.html)
 [![Migrations](https://img.shields.io/badge/golang--migrate-embed.FS-blue?style=flat&logo=postgresql)](https://github.com/golang-migrate/migrate)
 [![Asynq Workers](https://img.shields.io/badge/Asynq-Task%20Queue-FF6B6B?style=flat&logo=redis)](https://github.com/hibiken/asynq)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
@@ -18,6 +19,11 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ## 🌟 Key Features & Engineering Highlights
 
 * 🏗️ **Clean Architecture & Domain-Driven Design**: Strict separation of concerns across Domain, Service, Repository, and HTTP Presentation layers with Interface decoupling.
+* 💳 **Payment Lifecycle & Mock Gateway Architecture**:
+  * **Interface-Driven Payment Gateway (`PaymentGateway`)** supporting PromptPay (EMVCo QR Code), Credit Cards, and Wallets.
+  * **Payment Intent Generation**: Issues unique transaction references and payment URLs.
+  * **Atomic Payment Confirmation**: Pessimistic row locking (`SELECT ... FOR UPDATE`) preventing double-spending / race conditions during concurrent confirmation.
+  * **Order State Coordination**: Transitions order from `pending` to `paid`, creates official payment receipts, and cancels background stock rollback tasks.
 * 🔒 **Security & Authentication**:
   * 👑 **Secure Admin Creation CLI (`cmd/create-admin`)**: Out-of-band admin management tool with terminal password masking (`golang.org/x/term`), RFC 5322 email validation, 12+ character enforcement, and **Privilege Escalation prevention** (public registration restricted to `customer`).
   * Passwords hashed using **`bcrypt`** (salted & timing-attack resistant).
@@ -34,11 +40,11 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
   * Programmatic migrations with **`golang-migrate/migrate/v4`**.
   * Embedded SQL files inside static Go binary using **`embed.FS`** (zero external dependencies).
   * Safe **UP (upgrade)** and **DOWN (rollback)** schema changelogs (`schema_migrations` tracking).
-  * Zero-downtime schema evolution (e.g. `000002_add_categories_table`).
+  * Zero-downtime schema evolution (`000001` through `000004_create_payments_table`).
 * ⚡ **Event-Driven & Asynchronous Background Workers**:
   * Redis-backed Distributed Task Queue powered by **`hibiken/asynq`**.
   * **Immediate Async Jobs**: Simulated email notifications and receipts dispatched in background threads.
-  * **Delayed Scheduled Tasks**: Automated order cancellation and **stock restoration** for unpaid orders after timeout.
+  * **Delayed Scheduled Tasks**: 5-minute automated order timeout check and **stock restoration** for unpaid orders.
   * Fault-tolerant task retries with exponential backoff and dedicated worker pools.
 * 📖 **Interactive Swagger & OpenAPI Documentation**:
   * Auto-generated OpenAPI 2.0 specifications via **`swaggo/swag`**.
@@ -84,6 +90,7 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. HTTP Presentation Layer (Handler / Controllers)          │
 │    - product.Handler, user.Handler, order.Handler           │
+│    - payment.Handler (Intent, Confirm, Receipt)             │
 │    - Swagger UI (/swagger/index.html)                       │
 │    - Prometheus Metrics Endpoint (/metrics)                 │
 └──────────────┬───────────────────────────────┬──────────────┘
@@ -92,11 +99,12 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ┌──────────────────────────────┐ ┌─────────────────────────────┐
 │ 3. Core Business Logic       │ │ 4. Prometheus Server (9090) │
 │    - Order, Product, User    │ └─────────────┬───────────────┘
-│    - Auto-Migrations (embed) │               │ (PromQL)
-└──────────────┬───────────────┘               ▼
-               │ (Tasks)         ┌─────────────────────────────┐
-               ▼                 │ 5. Grafana Dashboard (3000) │
-┌──────────────────────────────┐ └─────────────────────────────┘
+│    - Payment & Mock Gateway  │               │ (PromQL)
+│    - Auto-Migrations (embed) │               ▼
+└──────────────┬───────────────┘ ┌─────────────────────────────┐
+               │ (Tasks)         │ 5. Grafana Dashboard (3000) │
+               ▼                 └─────────────────────────────┘
+┌──────────────────────────────┐
 │ 6. Redis Task Queue (asynq)  │
 └──────────────┬───────────────┘
                │ (Workers Pull)
@@ -104,7 +112,7 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ┌──────────────────────────────┐
 │ 7. Background Worker Server  │
 │    - Instant Email Worker    │
-│    - 1-Min Auto-Cancel &     │
+│    - 5-Min Auto-Cancel &     │
 │      Stock Restoral Worker   │
 └──────────────────────────────┘
 ```
@@ -117,7 +125,7 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 .
 ├── cmd/
 │   ├── api/
-│   │   └── main.go                         # REST API Entry Point, Metrics & Migrations
+│   │   └── main.go                         # REST API Entry Point, Metrics, Payments & Migrations
 │   ├── create-admin/                       # Secure Admin Creation CLI Tool
 │   │   ├── main.go
 │   │   └── main_test.go
@@ -134,16 +142,33 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 │   │   ├── postgres.go
 │   │   └── redis.go
 │   ├── domain/                             # Core Entities, DTOs, Role Constants & Interfaces
+│   │   ├── order.go
+│   │   ├── payment.go                      # Payment Model & PaymentGateway Interface
+│   │   ├── product.go
+│   │   └── user.go
 │   ├── metrics/                            # Prometheus Metric Definitions (RPS, Latency, Business)
 │   ├── middleware/                         # HTTP Middlewares (Auth, RBAC, Logger, Recovery, Metrics)
 │   ├── order/                              # Order & Checkout Module (Transactions + Locking)
+│   ├── payment/                            # Payment Module (Mock Gateway, Tx Repository, Service)
+│   │   ├── gateway.go                      # Mock Gateway (QR PromptPay & Checkout URLs)
+│   │   ├── handler.go
+│   │   ├── repository.go
+│   │   └── service.go
 │   ├── product/                            # Product Module (Postgres + Redis Cache Decorator)
 │   ├── user/                               # User & Authentication Module
 │   └── worker/                             # Event-Driven Background Worker Module
 ├── pkg/
 │   └── security/                           # Reusable Security Packages (JWT, Bcrypt)
 ├── migrations/                             # Versioned Database Migrations (Embedded via embed.FS)
-├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-13)
+│   ├── 000001_init_schema.up.sql
+│   ├── 000001_init_schema.down.sql
+│   ├── 000002_add_categories_table.up.sql
+│   ├── 000002_add_categories_table.down.sql
+│   ├── 000003_add_users_role_check.up.sql
+│   ├── 000003_add_users_role_check.down.sql
+│   ├── 000004_create_payments_table.up.sql # Payment records table
+│   └── 000004_create_payments_table.down.sql
+├── walkthroughs/                           # Complete Step-by-Step Learning Walkthroughs (Phases 1-14)
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
@@ -152,45 +177,6 @@ A high-performance, enterprise-grade E-Commerce REST API, Event-Driven Backgroun
 ├── go.mod
 └── go.sum
 ```
-
----
-
-## 🚀 Quick Start & Running the Stack
-
-### Prerequisites
-* [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
-* [Go 1.24+](https://golang.org/dl/) (optional, if running natively).
-
-### Option 1: Run Full 6-Container Stack with Docker Compose (Recommended)
-
-Start all services with a single command:
-
-```bash
-docker compose up --build -d
-```
-
-Check container status and health:
-```bash
-docker compose ps
-```
-
-* 🌐 **API Base URL**: `http://localhost:8080`
-* 📖 **Swagger UI Documentation**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
-* 📊 **Prometheus Server**: [http://localhost:9090](http://localhost:9090)
-* 📈 **Grafana Live Dashboard**: [http://localhost:3000](http://localhost:3000) *(User: `admin` / Password: `admin`)*
-* 🗄️ **PostgreSQL Port (Host)**: `localhost:15432`
-
----
-
-### 👑 Creating an Administrator Account (CLI)
-
-Public registration (`POST /api/auth/register`) strictly registers users with the `customer` role to prevent privilege escalation. To create an `admin` user with elevated access (for product management), run the interactive CLI tool with hidden password input:
-
-```bash
-go run ./cmd/create-admin/main.go --email admin@example.com
-```
-
-*(You will be prompted to enter and confirm a password with a minimum of 12 characters)*.
 
 ---
 
@@ -218,27 +204,19 @@ go run ./cmd/create-admin/main.go --email admin@example.com
 | `GET` | `/api/orders` | 🔒 User | List order history (Customer: own / Admin: all) |
 | `GET` | `/api/orders/{id}` | 🔒 User | Get order details with itemized breakdown |
 
+### 💳 Payments & Order Confirmation (Mock Gateway)
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/payments/intent` | 🔒 User | Request payment intent / QR Code / checkout link |
+| `POST` | `/api/payments/confirm` | 🌐 Public | Confirm payment from gateway / Webhook (`pending` $\to$ `paid`) |
+| `GET` | `/api/payments/orders/{id}` | 🔒 User | Get payment receipt and transaction details |
+
 ### 🩺 System, Health & Observability
 | Method | Endpoint | Access Level | Description |
 | :--- | :--- | :---: | :--- |
 | `GET` | `/health` | 🌐 Public | Health check report (DB, Redis, Environment) |
 | `GET` | `/metrics` | 🌐 Public | Prometheus raw metrics scraping endpoint |
 | `GET` | `/swagger/index.html` | 🌐 Public | Interactive Swagger UI API Documentation |
-
----
-
-## 🧪 Testing & Code Coverage
-
-Run the full automated test suite with verbose output:
-```bash
-go test -v ./...
-```
-
-Generate and view interactive HTML code coverage in your browser:
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
 
 ---
 
@@ -259,6 +237,7 @@ This project was built progressively through a hands-on, zero-to-hero curriculum
 11. [Walkthrough 11: Event-Driven & Asynchronous Background Workers](walkthroughs/walkthrough-11/walkthrough-11.md)
 12. [Walkthrough 12: Enterprise Database Migrations & Versioning](walkthroughs/walkthrough-12/walkthrough-12.md)
 13. [Walkthrough 13: Cloud Observability & Real-Time Metrics](walkthroughs/walkthrough-13/walkthrough-13.md)
+14. [Walkthrough 14: Payment Lifecycle & Mock Gateway Architecture](walkthroughs/walkthrough-14/walkthrough-14.md)
 
 ---
 
