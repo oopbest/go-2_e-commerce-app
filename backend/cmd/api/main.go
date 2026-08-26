@@ -120,7 +120,7 @@ func main() {
 	productRepo := product.NewCachedRepository(productPostgresRepo, rdb, 5*time.Minute)
 	productService := product.NewService(productRepo)
 	productHandler := product.NewHandler(productService)
-	orderRepo := order.NewRepository(db)
+	orderRepo := order.NewRepository(db, rdb)
 	orderService := order.NewService(orderRepo, taskDistributor) // 👈 ฉีด taskDistributor เข้าไป
 	orderHandler := order.NewHandler(orderService)
 

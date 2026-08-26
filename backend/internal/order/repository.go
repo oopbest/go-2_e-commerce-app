@@ -7,16 +7,19 @@ import (
 	"fmt"
 
 	"github.com/oopbest/ecommerce-app/internal/domain"
+	"github.com/redis/go-redis/v9"
 )
 
 type repository struct {
-	db *sql.DB
+	db  *sql.DB
+	rdb *redis.Client
 }
 
 // NewRepository Constructor สำหรับสร้าง Order Repository
-func NewRepository(db *sql.DB) domain.OrderRepository {
+func NewRepository(db *sql.DB, rdb *redis.Client) domain.OrderRepository {
 	return &repository{
-		db: db,
+		db:  db,
+		rdb: rdb,
 	}
 }
 
@@ -118,6 +121,11 @@ func (r *repository) CreateOrder(ctx context.Context, userID int, items []domain
 	// 5. Commit Transaction (ยืนยันการเปลี่ยนแปลงทั้งหมดลง Database)
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit order transaction: %w", err)
+	}
+
+	// 6. ล้างแคชสินค้าใน Redis ทันที เพื่อให้ผู้ใช้งานคนอื่นและหน้าร้านเห็นสต็อกล่าสุดทันที!
+	if r.rdb != nil {
+		_ = r.rdb.Del(ctx, "products:all").Err()
 	}
 
 	newOrder.Items = orderItems

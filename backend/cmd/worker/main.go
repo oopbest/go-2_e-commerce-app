@@ -48,7 +48,7 @@ func main() {
 	defer rdb.Close()
 
 	// 5. สร้าง Task Processor (Consumer)
-	orderRepo := order.NewRepository(db)
+	orderRepo := order.NewRepository(db, rdb)
 	processor := worker.NewRedisTaskProcessor(orderRepo, rdb)
 
 	// 6. ตั้งค่า Asynq Server (Worker Pool)
