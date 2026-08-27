@@ -1,6 +1,8 @@
 package product
 
 import (
+	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,5 +111,27 @@ func (r *inMemoryRepository) FindAllBrands() ([]domain.Brand, error) {
 		{ID: 2, Name: "Logitech G"},
 		{ID: 3, Name: "HyperX"},
 		{ID: 4, Name: "Alienware"},
+	}, nil
+}
+
+// FindWithFilter เมธอดจำลองสำหรับ inMemoryRepository
+func (r *inMemoryRepository) FindWithFilter(ctx context.Context, filter domain.ProductFilter) (*domain.ProductListResponse, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var matched []domain.Product
+	for _, p := range r.products {
+		if filter.Search != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(filter.Search)) {
+			continue
+		}
+		matched = append(matched, p)
+	}
+
+	return &domain.ProductListResponse{
+		Products:   matched,
+		TotalCount: len(matched),
+		Page:       1,
+		Limit:      len(matched),
+		TotalPages: 1,
 	}, nil
 }

@@ -1,6 +1,7 @@
 package product_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -63,6 +64,14 @@ func (m *MockProductRepository) FindAllBrands() ([]domain.Brand, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]domain.Brand), args.Error(1)
+}
+
+func (m *MockProductRepository) FindWithFilter(ctx context.Context, filter domain.ProductFilter) (*domain.ProductListResponse, error) {
+	args := m.Called(ctx, filter)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ProductListResponse), args.Error(1)
 }
 
 // ==========================================

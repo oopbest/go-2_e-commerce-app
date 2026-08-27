@@ -1,6 +1,7 @@
 package product
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -76,4 +77,9 @@ func (s *service) DeleteProduct(id int) error {
 // GetAllBrands ดึงรายชื่อแบรนด์ทั้งหมด
 func (s *service) GetAllBrands() ([]domain.Brand, error) {
 	return s.repo.FindAllBrands()
+}
+
+// GetProductsWithFilter ดึงสินค้าตามเงื่อนไขค้นหา ตัวกรอง และการแบ่งหน้า
+func (s *service) GetProductsWithFilter(ctx context.Context, filter domain.ProductFilter) (*domain.ProductListResponse, error) {
+	return s.repo.FindWithFilter(ctx, filter)
 }

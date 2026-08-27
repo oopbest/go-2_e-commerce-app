@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/oopbest/ecommerce-app/internal/domain"
 	"github.com/oopbest/ecommerce-app/internal/middleware"
@@ -35,20 +36,92 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc)
 }
 
 // handleGetProducts godoc
-// @Summary      Get all products
-// @Description  Retrieve a list of all products (Cached in Redis)
+// @Summary      Get products with search, filter, sort and pagination
+// @Description  Retrieve products list. If no query params are provided, returns all products. Supports search, category, brand, price range, stock, sort and pagination.
 // @Tags         Products
 // @Produce      json
-// @Success      200  {array}   domain.Product
-// @Failure      500  {object}  map[string]string
+// @Param        search        query     string  false  "Keyword to search in name or description"
+// @Param        category_id   query     int     false  "Filter by Category ID"
+// @Param        brand_id      query     int     false  "Filter by Brand ID"
+// @Param        min_price     query     number  false  "Minimum price"
+// @Param        max_price     query     number  false  "Maximum price"
+// @Param        in_stock      query     bool    false  "Filter in-stock products only (true)"
+// @Param        sort_by       query     string  false  "Sort by: price_asc, price_desc, rating, newest"
+// @Param        page          query     int     false  "Page number (default: 1)"
+// @Param        limit         query     int     false  "Items per page (default: 20, max: 100)"
+// @Success      200           {object}  domain.ProductListResponse
+// @Failure      500           {object}  map[string]string
 // @Router       /api/products [get]
 func (h *Handler) handleGetProducts(w http.ResponseWriter, r *http.Request) {
-	products, err := h.service.GetAllProducts()
+	q := r.URL.Query()
+
+	// 1. ถ้าไม่มี Query Params ใดๆ เลย -> คืนค่าตามเดิม (Backward Compatibility)
+	if len(q) == 0 {
+		products, err := h.service.GetAllProducts()
+		if err != nil {
+			h.sendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		h.sendJSON(w, http.StatusOK, products)
+		return
+	}
+
+	// 2. ถ้ามี Query Params -> แปลงค่าเป็น ProductFilter DTO
+	filter := domain.ProductFilter{
+		Search: strings.TrimSpace(q.Get("search")),
+		SortBy: q.Get("sort_by"),
+		Page:   1,
+		Limit:  20,
+	}
+
+	if catStr := q.Get("category_id"); catStr != "" {
+		if catID, err := strconv.Atoi(catStr); err == nil && catID > 0 {
+			filter.CategoryID = &catID
+		}
+	}
+
+	if brandStr := q.Get("brand_id"); brandStr != "" {
+		if bID, err := strconv.Atoi(brandStr); err == nil && bID > 0 {
+			filter.BrandID = &bID
+		}
+	}
+
+	if minStr := q.Get("min_price"); minStr != "" {
+		if minP, err := strconv.ParseFloat(minStr, 64); err == nil && minP >= 0 {
+			filter.MinPrice = &minP
+		}
+	}
+
+	if maxStr := q.Get("max_price"); maxStr != "" {
+		if maxP, err := strconv.ParseFloat(maxStr, 64); err == nil && maxP > 0 {
+			filter.MaxPrice = &maxP
+		}
+	}
+
+	if q.Get("in_stock") == "true" {
+		filter.InStockOnly = true
+	}
+
+	if pageStr := q.Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			filter.Page = p
+		}
+	}
+
+	if limitStr := q.Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			filter.Limit = l
+		}
+	}
+
+	// 3. เรียก Service พร้อม Context
+	resp, err := h.service.GetProductsWithFilter(r.Context(), filter)
 	if err != nil {
 		h.sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	h.sendJSON(w, http.StatusOK, products)
+
+	h.sendJSON(w, http.StatusOK, resp)
 }
 
 // handleGetProductByID godoc

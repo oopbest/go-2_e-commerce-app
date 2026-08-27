@@ -241,6 +241,21 @@ definitions:
       stock:
         type: integer
     type: object
+  domain.ProductListResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      products:
+        items:
+          $ref: '#/definitions/domain.Product'
+        type: array
+      total_count:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   domain.Promotion:
     properties:
       code:
@@ -668,23 +683,60 @@ paths:
       - Payments
   /api/products:
     get:
-      description: Retrieve a list of all products (Cached in Redis)
+      description: Retrieve products list. If no query params are provided, returns
+        all products. Supports search, category, brand, price range, stock, sort and
+        pagination.
+      parameters:
+      - description: Keyword to search in name or description
+        in: query
+        name: search
+        type: string
+      - description: Filter by Category ID
+        in: query
+        name: category_id
+        type: integer
+      - description: Filter by Brand ID
+        in: query
+        name: brand_id
+        type: integer
+      - description: Minimum price
+        in: query
+        name: min_price
+        type: number
+      - description: Maximum price
+        in: query
+        name: max_price
+        type: number
+      - description: Filter in-stock products only (true)
+        in: query
+        name: in_stock
+        type: boolean
+      - description: 'Sort by: price_asc, price_desc, rating, newest'
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.Product'
-            type: array
+            $ref: '#/definitions/domain.ProductListResponse'
         "500":
           description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Get all products
+      summary: Get products with search, filter, sort and pagination
       tags:
       - Products
     post:

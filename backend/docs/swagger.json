@@ -509,22 +509,75 @@
         },
         "/api/products": {
             "get": {
-                "description": "Retrieve a list of all products (Cached in Redis)",
+                "description": "Retrieve products list. If no query params are provided, returns all products. Supports search, category, brand, price range, stock, sort and pagination.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Products"
                 ],
-                "summary": "Get all products",
+                "summary": "Get products with search, filter, sort and pagination",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Keyword to search in name or description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by Category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by Brand ID",
+                        "name": "brand_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimum price",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maximum price",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter in-stock products only (true)",
+                        "name": "in_stock",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort by: price_asc, price_desc, rating, newest",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.Product"
-                            }
+                            "$ref": "#/definitions/domain.ProductListResponse"
                         }
                     },
                     "500": {
@@ -1238,6 +1291,29 @@
                     "additionalProperties": {}
                 },
                 "stock": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.ProductListResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.Product"
+                    }
+                },
+                "total_count": {
+                    "type": "integer"
+                },
+                "total_pages": {
                     "type": "integer"
                 }
             }

@@ -70,6 +70,14 @@ func (m *MockProductService) GetAllBrands() ([]domain.Brand, error) {
 	return args.Get(0).([]domain.Brand), args.Error(1)
 }
 
+func (m *MockProductService) GetProductsWithFilter(ctx context.Context, filter domain.ProductFilter) (*domain.ProductListResponse, error) {
+	args := m.Called(ctx, filter)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ProductListResponse), args.Error(1)
+}
+
 // ==========================================
 // 2. HTTP Handler Tests
 // ==========================================

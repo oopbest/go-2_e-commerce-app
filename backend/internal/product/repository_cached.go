@@ -166,3 +166,61 @@ func (r *cachedRepository) FindAllBrands() ([]domain.Brand, error) {
 
 	return brands, nil
 }
+
+// FindWithFilter ดึงรายการสินค้าพร้อมตัวกรอง (ตรวจแคชตาม Query Parameters เสมอ)
+func (r *cachedRepository) FindWithFilter(ctx context.Context, filter domain.ProductFilter) (*domain.ProductListResponse, error) {
+	// สร้าง Cache Key เฉพาะเจาะจงตามเงื่อนไขที่ส่งมา
+	cacheKey := fmt.Sprintf(
+		"products:filter:s=%s:c=%v:b=%v:min=%v:max=%v:stk=%t:sort=%s:p=%d:l=%d",
+		filter.Search,
+		derefInt(filter.CategoryID),
+		derefInt(filter.BrandID),
+		derefFloat(filter.MinPrice),
+		derefFloat(filter.MaxPrice),
+		filter.InStockOnly,
+		filter.SortBy,
+		filter.Page,
+		filter.Limit,
+	)
+
+	// 1. ตรวจสอบใน Redis
+	if r.rdb != nil {
+		cachedJSON, err := r.rdb.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var resp domain.ProductListResponse
+			if err := json.Unmarshal([]byte(cachedJSON), &resp); err == nil {
+				slog.Debug("⚡ Cache HIT: " + cacheKey)
+				return &resp, nil
+			}
+		}
+	}
+
+	// 2. Cache Miss: ดึงจาก Postgres
+	resp, err := r.next.FindWithFilter(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. บันทึกลง Redis (TTL 1 นาที สำหรับ Dynamic Queries)
+	if r.rdb != nil {
+		if data, err := json.Marshal(resp); err == nil {
+			_ = r.rdb.Set(ctx, cacheKey, data, 1*time.Minute).Err()
+		}
+	}
+
+	return resp, nil
+}
+
+func derefInt(i *int) any {
+	if i == nil {
+		return "nil"
+	}
+	return *i
+}
+
+func derefFloat(f *float64) any {
+	if f == nil {
+		return "nil"
+	}
+	return *f
+}
