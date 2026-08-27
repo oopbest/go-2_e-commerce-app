@@ -1,0 +1,12 @@
+DROP INDEX IF EXISTS idx_products_specs;
+DROP INDEX IF EXISTS idx_products_brand_id;
+
+ALTER TABLE products 
+DROP COLUMN IF EXISTS reviews_count,
+DROP COLUMN IF EXISTS rating,
+DROP COLUMN IF EXISTS specs,
+DROP COLUMN IF EXISTS sku,
+DROP COLUMN IF EXISTS image_url,
+DROP COLUMN IF EXISTS brand_id;
+
+DROP TABLE IF EXISTS brands;

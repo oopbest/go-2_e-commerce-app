@@ -101,3 +101,13 @@ func (r *inMemoryRepository) Delete(id int) error {
 	}
 	return domain.ErrProductNotFound
 }
+
+// FindAllBrands จำลองข้อมูลแบรนด์สำหรับ Unit Test
+func (r *inMemoryRepository) FindAllBrands() ([]domain.Brand, error) {
+	return []domain.Brand{
+		{ID: 1, Name: "Keychron"},
+		{ID: 2, Name: "Logitech G"},
+		{ID: 3, Name: "HyperX"},
+		{ID: 4, Name: "Alienware"},
+	}, nil
+}

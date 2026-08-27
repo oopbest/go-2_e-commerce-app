@@ -72,3 +72,8 @@ func (s *service) DeleteProduct(id int) error {
 	}
 	return s.repo.Delete(id)
 }
+
+// GetAllBrands ดึงรายชื่อแบรนด์ทั้งหมด
+func (s *service) GetAllBrands() ([]domain.Brand, error) {
+	return s.repo.FindAllBrands()
+}

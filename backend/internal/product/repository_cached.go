@@ -134,3 +134,35 @@ func (r *cachedRepository) invalidateCache(keys ...string) {
 		slog.Debug("🧹 Cache INVALIDATED", "key", k)
 	}
 }
+
+// FindAllBrands ดึงรายชื่อแบรนด์ทั้งหมด (พร้อมแคชใน Redis ด้วยคีย์ brands:all)
+func (r *cachedRepository) FindAllBrands() ([]domain.Brand, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cacheKey := "brands:all"
+
+	// 1. ตรวจสอบใน Redis ก่อน
+	cachedJSON, err := r.rdb.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var brands []domain.Brand
+		if err := json.Unmarshal([]byte(cachedJSON), &brands); err == nil {
+			slog.Debug("⚡ Cache HIT: brands:all")
+			return brands, nil
+		}
+	}
+
+	// 2. Cache Miss: ดึงจาก Postgres
+	slog.Debug("🗄️ Cache MISS: brands:all -> fetching from Postgres")
+	brands, err := r.next.FindAllBrands()
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. เซฟลง Redis
+	if data, err := json.Marshal(brands); err == nil {
+		_ = r.rdb.Set(ctx, cacheKey, data, r.ttl).Err()
+	}
+
+	return brands, nil
+}

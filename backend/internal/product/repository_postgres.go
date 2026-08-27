@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -20,29 +21,50 @@ func NewPostgresRepository(db *sql.DB) domain.ProductRepository {
 	}
 }
 
-// FindAll ดึงรายการสินค้าทั้งหมดจาก Database
+// FindAll ดึงรายการสินค้าทั้งหมดจาก Database พร้อม JOIN หมวดหมู่และแบรนด์
 func (r *postgresRepository) FindAll() ([]domain.Product, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	query := `
-		SELECT id, name, description, price, stock, created_at
-		FROM products
-		ORDER BY id ASC
+		SELECT 
+			p.id, p.name, p.description, p.price, p.stock,
+			p.category_id, COALESCE(c.name, ''),
+			p.brand_id, COALESCE(b.name, ''),
+			COALESCE(p.image_url, ''), COALESCE(p.sku, ''),
+			COALESCE(p.specs, '{}'::jsonb),
+			p.rating, p.reviews_count, p.created_at
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		LEFT JOIN brands b ON p.brand_id = b.id
+		ORDER BY p.id ASC
 	`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // ต้องปิด rows เสมอเมื่ออ่านเสร็จเพื่อคืน Connection เข้า Pool
+	defer rows.Close()
 
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		// Scan ตัวแปรตามลำดับคอลัมน์ที่ SELECT ออกมา
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.CreatedAt); err != nil {
+		var specsBytes []byte
+
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.Description, &p.Price, &p.Stock,
+			&p.CategoryID, &p.CategoryName,
+			&p.BrandID, &p.BrandName,
+			&p.ImageURL, &p.SKU,
+			&specsBytes,
+			&p.Rating, &p.ReviewsCount, &p.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
+
+		if len(specsBytes) > 0 {
+			_ = json.Unmarshal(specsBytes, &p.Specs)
+		}
+
 		products = append(products, p)
 	}
 
@@ -53,19 +75,34 @@ func (r *postgresRepository) FindAll() ([]domain.Product, error) {
 	return products, nil
 }
 
-// FindByID ค้นหาสินค้าตาม ID
+// FindByID ค้นหาสินค้าตาม ID พร้อมสเปกและแบรนด์
 func (r *postgresRepository) FindByID(id int) (*domain.Product, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	query := `
-		SELECT id, name, description, price, stock, created_at
-		FROM products
-		WHERE id = $1
+		SELECT 
+			p.id, p.name, p.description, p.price, p.stock,
+			p.category_id, COALESCE(c.name, ''),
+			p.brand_id, COALESCE(b.name, ''),
+			COALESCE(p.image_url, ''), COALESCE(p.sku, ''),
+			COALESCE(p.specs, '{}'::jsonb),
+			p.rating, p.reviews_count, p.created_at
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		LEFT JOIN brands b ON p.brand_id = b.id
+		WHERE p.id = $1
 	`
 	var p domain.Product
+	var specsBytes []byte
+
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&p.ID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.CreatedAt,
+		&p.ID, &p.Name, &p.Description, &p.Price, &p.Stock,
+		&p.CategoryID, &p.CategoryName,
+		&p.BrandID, &p.BrandName,
+		&p.ImageURL, &p.SKU,
+		&specsBytes,
+		&p.Rating, &p.ReviewsCount, &p.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -74,7 +111,38 @@ func (r *postgresRepository) FindByID(id int) (*domain.Product, error) {
 		return nil, err
 	}
 
+	if len(specsBytes) > 0 {
+		_ = json.Unmarshal(specsBytes, &p.Specs)
+	}
+
 	return &p, nil
+}
+
+// FindAllBrands ดึงรายชื่อแบรนด์ทั้งหมด
+func (r *postgresRepository) FindAllBrands() ([]domain.Brand, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT id, name, COALESCE(logo_url, ''), COALESCE(description, ''), created_at
+		FROM brands
+		ORDER BY id ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var brands []domain.Brand
+	for rows.Next() {
+		var b domain.Brand
+		if err := rows.Scan(&b.ID, &b.Name, &b.LogoURL, &b.Description, &b.CreatedAt); err != nil {
+			return nil, err
+		}
+		brands = append(brands, b)
+	}
+	return brands, nil
 }
 
 // Create เพิ่มสินค้าใหม่ลง Database
@@ -82,21 +150,29 @@ func (r *postgresRepository) Create(input domain.CreateProductInput) (*domain.Pr
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// ใช้ RETURNING เพื่อเอา ID และ CreatedAt ที่ Database เจนให้ออกมาทันที
+	specsJSON, _ := json.Marshal(input.Specs)
+
 	query := `
-		INSERT INTO products (name, description, price, stock)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at
+		INSERT INTO products (name, description, price, stock, category_id, brand_id, image_url, sku, specs)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, rating, reviews_count, created_at
 	`
 	var p domain.Product
 	p.Name = input.Name
 	p.Description = input.Description
 	p.Price = input.Price
 	p.Stock = input.Stock
+	p.CategoryID = input.CategoryID
+	p.BrandID = input.BrandID
+	p.ImageURL = input.ImageURL
+	p.SKU = input.SKU
+	p.Specs = input.Specs
 
-	err := r.db.QueryRowContext(ctx, query, input.Name, input.Description, input.Price, input.Stock).Scan(
-		&p.ID, &p.CreatedAt,
-	)
+	err := r.db.QueryRowContext(
+		ctx, query,
+		input.Name, input.Description, input.Price, input.Stock,
+		input.CategoryID, input.BrandID, input.ImageURL, input.SKU, specsJSON,
+	).Scan(&p.ID, &p.Rating, &p.ReviewsCount, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +185,14 @@ func (r *postgresRepository) Update(id int, input domain.UpdateProductInput) (*d
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	specsJSON, _ := json.Marshal(input.Specs)
+
 	query := `
 		UPDATE products
-		SET name = $1, description = $2, price = $3, stock = $4
-		WHERE id = $5
-		RETURNING created_at
+		SET name = $1, description = $2, price = $3, stock = $4,
+		    category_id = $5, brand_id = $6, image_url = $7, sku = $8, specs = $9
+		WHERE id = $10
+		RETURNING id, rating, reviews_count, created_at
 	`
 	var p domain.Product
 	p.ID = id
@@ -121,10 +200,17 @@ func (r *postgresRepository) Update(id int, input domain.UpdateProductInput) (*d
 	p.Description = input.Description
 	p.Price = input.Price
 	p.Stock = input.Stock
+	p.CategoryID = input.CategoryID
+	p.BrandID = input.BrandID
+	p.ImageURL = input.ImageURL
+	p.SKU = input.SKU
+	p.Specs = input.Specs
 
-	err := r.db.QueryRowContext(ctx, query, input.Name, input.Description, input.Price, input.Stock, id).Scan(
-		&p.CreatedAt,
-	)
+	err := r.db.QueryRowContext(
+		ctx, query,
+		input.Name, input.Description, input.Price, input.Stock,
+		input.CategoryID, input.BrandID, input.ImageURL, input.SKU, specsJSON, id,
+	).Scan(&p.ID, &p.Rating, &p.ReviewsCount, &p.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrProductNotFound

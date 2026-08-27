@@ -27,6 +27,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.HandlerFunc)
 	// Public Endpoints (ไม่ต้องใช้ Token)
 	mux.HandleFunc("GET /api/products", h.handleGetProducts)
 	mux.HandleFunc("GET /api/products/{id}", h.handleGetProductByID)
+	mux.HandleFunc("GET /api/brands", h.handleGetBrands)
 	// Protected Endpoints (ต้องมี Token และต้องเป็น Admin เท่านั้น)
 	mux.HandleFunc("POST /api/products", auth(middleware.RequireRole(domain.RoleAdmin, h.handleCreateProduct)))
 	mux.HandleFunc("PUT /api/products/{id}", auth(middleware.RequireRole(domain.RoleAdmin, h.handleUpdateProduct)))
@@ -78,6 +79,23 @@ func (h *Handler) handleGetProductByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.sendJSON(w, http.StatusOK, product)
+}
+
+// handleGetBrands godoc
+// @Summary      Get all brands
+// @Description  Retrieve a list of all brands (Cached in Redis)
+// @Tags         Brands
+// @Produce      json
+// @Success      200  {array}   domain.Brand
+// @Failure      500  {object}  map[string]string
+// @Router       /api/brands [get]
+func (h *Handler) handleGetBrands(w http.ResponseWriter, r *http.Request) {
+	brands, err := h.service.GetAllBrands()
+	if err != nil {
+		h.sendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.sendJSON(w, http.StatusOK, brands)
 }
 
 // handleCreateProduct godoc

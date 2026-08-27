@@ -62,6 +62,14 @@ func (m *MockProductService) DeleteProduct(id int) error {
 	return args.Error(0)
 }
 
+func (m *MockProductService) GetAllBrands() ([]domain.Brand, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.Brand), args.Error(1)
+}
+
 // ==========================================
 // 2. HTTP Handler Tests
 // ==========================================
