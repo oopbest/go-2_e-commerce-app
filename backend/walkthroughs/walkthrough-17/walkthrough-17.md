@@ -96,6 +96,14 @@ cacheKey := fmt.Sprintf(
 
 ---
 
+### 2.5 Seeding 50 Realistic Enterprise Products (`migrations/000007_seed_50_products.up.sql`)
+- เพิ่มแบรนด์ระดับโลก: `Razer`, `Corsair`, `ASUS ROG`, `SteelSeries` รวมเป็น 8 แบรนด์
+- ใส่สินค้าคุณภาพสูงครบ 50 รายการ กระจายครบทุกช่วงราคา (฿790 - ฿69,900)
+- กระจายทั้งสินค้า Gaming Gear และ Office & Productivity พร้อมรูปภาพคมชัดและ JSONB Specs ครบถ้วน
+- มีสินค้าสต็อก 0 สำหรับทดสอบตัวกรอง `in_stock_only`
+
+---
+
 ## 🧪 3. ผลการทดสอบและการตรวจสอบ (Verification)
 
 ### 3.1 Unit Testing
@@ -111,32 +119,30 @@ go test ./...
    ```bash
    curl -s http://localhost:8080/api/products
    ```
-   *ผลลัพธ์*: คืน Array สินค้า `[...]` 4 ชิ้นปกติ ไม่ส่งผลกระทบต่อ Storefront เดิม
+   *ผลลัพธ์*: คืน Array สินค้าปกติ ไม่ส่งผลกระทบต่อ Storefront เดิม
 
 2. **ทดสอบ Keyword Search (`?search=keyboard`)**:
    ```bash
    curl -s "http://localhost:8080/api/products?search=keyboard"
    ```
-   *ผลลัพธ์*: คืนเฉพาะ `Mechanical Keyboard` พร้อม `total_count: 1, total_pages: 1`
+   *ผลลัพธ์*: คืนเฉพาะคีย์บอร์ดที่ตรงเงื่อนไขพร้อมข้อมูล Pagination
 
 3. **ทดสอบ Sorting & Pagination (`?sort_by=price_desc&limit=2`)**:
    ```bash
    curl -s "http://localhost:8080/api/products?sort_by=price_desc&limit=2"
    ```
-   *ผลลัพธ์*: เรียงสินค้าแพงสุดขึ้นก่อน:
-   - ชิ้นที่ 1: `UltraWide Curved Monitor 34` (฿14,900)
-   - ชิ้นที่ 2: `Mechanical Keyboard` (฿2,590)
-   - ข้อมูลเพจ: `total_count: 4, page: 1, limit: 2, total_pages: 2`
+   *ผลลัพธ์*: เรียงสินค้าแพงสุดขึ้นก่อน (ASUS ROG Zephyrus ฿69,900 และ Alienware m16 ฿65,900)
 
-4. **ทดสอบ Brand Filter (`?brand_id=2`)**:
+4. **ทดสอบจำนวนสินค้าทั้งหมด 50 ชิ้น (`?limit=1`)**:
    ```bash
-   curl -s "http://localhost:8080/api/products?brand_id=2"
+   curl -s "http://localhost:8080/api/products?limit=1"
    ```
-   *ผลลัพธ์*: คืนเฉพาะสินค้าของ `Logitech G` (`Wireless Mouse`, ฿1,290)
+   *ผลลัพธ์*: `"total_count": 50, "total_pages": 50` สินค้าเข้าสู่ระบบครบถ้วน 50 ชิ้นสมบูรณ์แบบ!
 
 ---
 
 ## 📦 4. คำสั่ง Git Commit สำหรับ Backend Phase C
+
 
 ```bash
 cd backend
