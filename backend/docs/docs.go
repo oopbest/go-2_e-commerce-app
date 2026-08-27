@@ -127,6 +127,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/brands": {
+            "get": {
+                "description": "Retrieve a list of all brands (Cached in Redis)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "Get all brands",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.Brand"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/orders": {
             "get": {
                 "security": [
@@ -750,6 +782,26 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.Brand": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "domain.CheckoutInput": {
             "type": "object",
             "properties": {
@@ -804,7 +856,16 @@ const docTemplate = `{
         "domain.CreateProductInput": {
             "type": "object",
             "properties": {
+                "brand_id": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
                 "description": {
+                    "type": "string"
+                },
+                "image_url": {
                     "type": "string"
                 },
                 "name": {
@@ -812,6 +873,13 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "number"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "specs": {
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "stock": {
                     "type": "integer"
@@ -941,6 +1009,18 @@ const docTemplate = `{
         "domain.Product": {
             "type": "object",
             "properties": {
+                "brand_id": {
+                    "type": "integer"
+                },
+                "brand_name": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
+                "category_name": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -950,11 +1030,27 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "image_url": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
                 "price": {
                     "type": "number"
+                },
+                "rating": {
+                    "type": "number"
+                },
+                "reviews_count": {
+                    "type": "integer"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "specs": {
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "stock": {
                     "type": "integer"
@@ -975,7 +1071,16 @@ const docTemplate = `{
         "domain.UpdateProductInput": {
             "type": "object",
             "properties": {
+                "brand_id": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
                 "description": {
+                    "type": "string"
+                },
+                "image_url": {
                     "type": "string"
                 },
                 "name": {
@@ -983,6 +1088,13 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "number"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "specs": {
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "stock": {
                     "type": "integer"

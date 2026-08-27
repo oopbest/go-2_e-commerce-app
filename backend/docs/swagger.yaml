@@ -7,6 +7,19 @@ definitions:
       user:
         $ref: '#/definitions/domain.User'
     type: object
+  domain.Brand:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      logo_url:
+        type: string
+      name:
+        type: string
+    type: object
   domain.CheckoutInput:
     properties:
       items:
@@ -42,12 +55,23 @@ definitions:
     type: object
   domain.CreateProductInput:
     properties:
+      brand_id:
+        type: integer
+      category_id:
+        type: integer
       description:
+        type: string
+      image_url:
         type: string
       name:
         type: string
       price:
         type: number
+      sku:
+        type: string
+      specs:
+        additionalProperties: {}
+        type: object
       stock:
         type: integer
     type: object
@@ -133,16 +157,35 @@ definitions:
     type: object
   domain.Product:
     properties:
+      brand_id:
+        type: integer
+      brand_name:
+        type: string
+      category_id:
+        type: integer
+      category_name:
+        type: string
       created_at:
         type: string
       description:
         type: string
       id:
         type: integer
+      image_url:
+        type: string
       name:
         type: string
       price:
         type: number
+      rating:
+        type: number
+      reviews_count:
+        type: integer
+      sku:
+        type: string
+      specs:
+        additionalProperties: {}
+        type: object
       stock:
         type: integer
     type: object
@@ -155,12 +198,23 @@ definitions:
     type: object
   domain.UpdateProductInput:
     properties:
+      brand_id:
+        type: integer
+      category_id:
+        type: integer
       description:
+        type: string
+      image_url:
         type: string
       name:
         type: string
       price:
         type: number
+      sku:
+        type: string
+      specs:
+        additionalProperties: {}
+        type: object
       stock:
         type: integer
     type: object
@@ -257,6 +311,27 @@ paths:
       summary: Register a new user
       tags:
       - Auth
+  /api/brands:
+    get:
+      description: Retrieve a list of all brands (Cached in Redis)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Brand'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all brands
+      tags:
+      - Brands
   /api/orders:
     get:
       description: 'Get list of orders (Customer: own orders, Admin: all orders)'
