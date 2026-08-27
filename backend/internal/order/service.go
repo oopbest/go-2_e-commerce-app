@@ -48,7 +48,7 @@ func (s *service) Checkout(ctx context.Context, userID int, input domain.Checkou
 	}
 
 	// 3. ส่งต่อไปยัง Repository เพื่อทำ Database Transaction & ตัดสต็อก
-	createdOrder, err := s.repo.CreateOrder(ctx, userID, input.Items)
+	createdOrder, err := s.repo.CreateOrder(ctx, userID, input)
 	if err != nil {
 		return nil, err
 	}

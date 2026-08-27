@@ -11,21 +11,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hibiken/asynq"
 	_ "github.com/oopbest/ecommerce-app/docs" // Import Docs ที่จะถูกสร้างโดย swag init
 	"github.com/oopbest/ecommerce-app/internal/config"
 	"github.com/oopbest/ecommerce-app/internal/database"
+	"github.com/oopbest/ecommerce-app/internal/flashsale"
 	"github.com/oopbest/ecommerce-app/internal/middleware"
 	"github.com/oopbest/ecommerce-app/internal/order"
-	"github.com/oopbest/ecommerce-app/internal/product"
-	"github.com/oopbest/ecommerce-app/internal/user"
-	httpSwagger "github.com/swaggo/http-swagger/v2"
-
-	"github.com/hibiken/asynq"
-	"github.com/oopbest/ecommerce-app/internal/worker"
-
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"github.com/oopbest/ecommerce-app/internal/payment"
+	"github.com/oopbest/ecommerce-app/internal/product"
+	"github.com/oopbest/ecommerce-app/internal/promotion"
+	"github.com/oopbest/ecommerce-app/internal/user"
+	"github.com/oopbest/ecommerce-app/internal/worker"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 // @title           Go E-Commerce REST API
@@ -124,11 +123,21 @@ func main() {
 	orderService := order.NewService(orderRepo, taskDistributor) // 👈 ฉีด taskDistributor เข้าไป
 	orderHandler := order.NewHandler(orderService)
 
-	// 💳 สร้าง Payment Module (ใหม่!)
+	// 💳 สร้าง Payment Module
 	paymentRepo := payment.NewRepository(db)
 	paymentGateway := payment.NewMockGateway()
 	paymentService := payment.NewService(paymentRepo, orderRepo, paymentGateway)
 	paymentHandler := payment.NewHandler(paymentService)
+
+	// 🎟️ สร้าง Promotion Module
+	promotionRepo := promotion.NewRepository(db)
+	promotionService := promotion.NewService(promotionRepo)
+	promotionHandler := promotion.NewHandler(promotionService)
+
+	// ⚡ สร้าง Flash Sale Module
+	flashSaleRepo := flashsale.NewRepository(db, rdb)
+	flashSaleService := flashsale.NewService(flashSaleRepo)
+	flashSaleHandler := flashsale.NewHandler(flashSaleService)
 
 	// ==========================================
 	// 6. Router & Middleware Pipeline
@@ -142,8 +151,10 @@ func main() {
 	productHandler.RegisterRoutes(mux, auth)
 	orderHandler.RegisterRoutes(mux, auth)
 	paymentHandler.RegisterRoutes(mux, auth)
+	promotionHandler.RegisterRoutes(mux, auth)
+	flashSaleHandler.RegisterRoutes(mux)
 
-	// 📖 Swagger UI Endpoint (ใหม่!)
+	// 📖 Swagger UI Endpoint
 	mux.HandleFunc("GET /swagger/", httpSwagger.WrapHandler)
 
 	// 📊 Prometheus Metrics Endpoint

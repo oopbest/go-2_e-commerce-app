@@ -22,6 +22,8 @@ definitions:
     type: object
   domain.CheckoutInput:
     properties:
+      coupon_code:
+        type: string
       items:
         items:
           $ref: '#/definitions/domain.CheckoutItemInput'
@@ -75,6 +77,50 @@ definitions:
       stock:
         type: integer
     type: object
+  domain.FlashSale:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/domain.FlashSaleItem'
+        type: array
+      starts_at:
+        type: string
+      title:
+        type: string
+    type: object
+  domain.FlashSaleItem:
+    properties:
+      created_at:
+        type: string
+      flash_price:
+        type: number
+      flash_sale_id:
+        type: integer
+      flash_stock:
+        type: integer
+      id:
+        type: integer
+      image_url:
+        type: string
+      original_price:
+        type: number
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      sold_count:
+        type: integer
+    type: object
   domain.LoginInput:
     properties:
       email:
@@ -84,8 +130,14 @@ definitions:
     type: object
   domain.Order:
     properties:
+      coupon_id:
+        description: "\U0001F448 คูปองที่ใช้"
+        type: integer
       created_at:
         type: string
+      discount_amount:
+        description: "\U0001F448 ยอดส่วนลดจากคูปอง"
+        type: number
       id:
         type: integer
       items:
@@ -189,6 +241,41 @@ definitions:
       stock:
         type: integer
     type: object
+  domain.Promotion:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      discount_type:
+        description: '"fixed" หรือ "percentage"'
+        type: string
+      discount_value:
+        description: เช่น 100 บาท หรือ 15%
+        type: number
+      expires_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      max_discount:
+        description: เพดานลดสูงสุด (กรณีคิดเป็น %)
+        type: number
+      min_spend:
+        description: ยอดซื้อขั้นต่ำ
+        type: number
+      starts_at:
+        type: string
+      title:
+        type: string
+      total_quota:
+        type: integer
+      used_count:
+        type: integer
+    type: object
   domain.RegisterInput:
     properties:
       email:
@@ -228,6 +315,24 @@ definitions:
         type: integer
       role:
         type: string
+    type: object
+  domain.ValidationResult:
+    properties:
+      discount_amount:
+        type: number
+      final_total:
+        type: number
+      promotion:
+        $ref: '#/definitions/domain.Promotion'
+      subtotal:
+        type: number
+    type: object
+  promotion.ValidateCouponRequest:
+    properties:
+      code:
+        type: string
+      subtotal:
+        type: number
     type: object
 host: localhost:8080
 info:
@@ -332,6 +437,26 @@ paths:
       summary: Get all brands
       tags:
       - Brands
+  /api/flash-sales/active:
+    get:
+      description: ดึงข้อมูลแคมเปญ Flash Sale ที่กำลังทำงาน พร้อมรายการสินค้า ราคาพิเศษ
+        และโควตาสต็อก
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.FlashSale'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get current active flash sale (ดึงแคมเปญ Flash Sale ปัจจุบัน)
+      tags:
+      - FlashSales
   /api/orders:
     get:
       description: 'Get list of orders (Customer: own orders, Admin: all orders)'
@@ -726,6 +851,61 @@ paths:
       summary: Update a product
       tags:
       - Products
+  /api/promotions:
+    get:
+      description: ดึงรายการคูปองส่วนลดทั้งหมดที่ยังเปิดใช้งานและยังไม่หมดอายุ
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Promotion'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get active promotions (คูปองส่วนลดที่ใช้งานได้)
+      tags:
+      - Promotions
+  /api/promotions/validate:
+    post:
+      consumes:
+      - application/json
+      description: ตรวจสอบรหัสคูปองกับยอดรวมคำสั่งซื้อ พร้อมคำนวณยอดส่วนลดสุทธิ
+      parameters:
+      - description: Coupon Code and Subtotal
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/promotion.ValidateCouponRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.ValidationResult'
+        "400":
+          description: Invalid coupon or conditions not met
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Coupon not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Validate coupon code (ตรวจสอบและคำนวณส่วนลด)
+      tags:
+      - Promotions
 securityDefinitions:
   BearerAuth:
     description: 'Type "Bearer" followed by a space and JWT token. Example: "Bearer

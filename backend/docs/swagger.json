@@ -153,6 +153,35 @@
                 }
             }
         },
+        "/api/flash-sales/active": {
+            "get": {
+                "description": "ดึงข้อมูลแคมเปญ Flash Sale ที่กำลังทำงาน พร้อมรายการสินค้า ราคาพิเศษ และโควตาสต็อก",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "FlashSales"
+                ],
+                "summary": "Get current active flash sale (ดึงแคมเปญ Flash Sale ปัจจุบัน)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.FlashSale"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/orders": {
             "get": {
                 "security": [
@@ -762,6 +791,90 @@
                     }
                 }
             }
+        },
+        "/api/promotions": {
+            "get": {
+                "description": "ดึงรายการคูปองส่วนลดทั้งหมดที่ยังเปิดใช้งานและยังไม่หมดอายุ",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Promotions"
+                ],
+                "summary": "Get active promotions (คูปองส่วนลดที่ใช้งานได้)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.Promotion"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/promotions/validate": {
+            "post": {
+                "description": "ตรวจสอบรหัสคูปองกับยอดรวมคำสั่งซื้อ พร้อมคำนวณยอดส่วนลดสุทธิ",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Promotions"
+                ],
+                "summary": "Validate coupon code (ตรวจสอบและคำนวณส่วนลด)",
+                "parameters": [
+                    {
+                        "description": "Coupon Code and Subtotal",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/promotion.ValidateCouponRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ValidationResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid coupon or conditions not met",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Coupon not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -799,6 +912,9 @@
         "domain.CheckoutInput": {
             "type": "object",
             "properties": {
+                "coupon_code": {
+                    "type": "string"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -880,6 +996,73 @@
                 }
             }
         },
+        "domain.FlashSale": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.FlashSaleItem"
+                    }
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.FlashSaleItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "flash_price": {
+                    "type": "number"
+                },
+                "flash_sale_id": {
+                    "type": "integer"
+                },
+                "flash_stock": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "original_price": {
+                    "type": "number"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "sold_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "domain.LoginInput": {
             "type": "object",
             "properties": {
@@ -894,8 +1077,16 @@
         "domain.Order": {
             "type": "object",
             "properties": {
+                "coupon_id": {
+                    "description": "👈 คูปองที่ใช้",
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string"
+                },
+                "discount_amount": {
+                    "description": "👈 ยอดส่วนลดจากคูปอง",
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"
@@ -1051,6 +1242,57 @@
                 }
             }
         },
+        "domain.Promotion": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "discount_type": {
+                    "description": "\"fixed\" หรือ \"percentage\"",
+                    "type": "string"
+                },
+                "discount_value": {
+                    "description": "เช่น 100 บาท หรือ 15%",
+                    "type": "number"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_discount": {
+                    "description": "เพดานลดสูงสุด (กรณีคิดเป็น %)",
+                    "type": "number"
+                },
+                "min_spend": {
+                    "description": "ยอดซื้อขั้นต่ำ",
+                    "type": "number"
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_quota": {
+                    "type": "integer"
+                },
+                "used_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "domain.RegisterInput": {
             "type": "object",
             "properties": {
@@ -1109,6 +1351,34 @@
                 },
                 "role": {
                     "type": "string"
+                }
+            }
+        },
+        "domain.ValidationResult": {
+            "type": "object",
+            "properties": {
+                "discount_amount": {
+                    "type": "number"
+                },
+                "final_total": {
+                    "type": "number"
+                },
+                "promotion": {
+                    "$ref": "#/definitions/domain.Promotion"
+                },
+                "subtotal": {
+                    "type": "number"
+                }
+            }
+        },
+        "promotion.ValidateCouponRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "subtotal": {
+                    "type": "number"
                 }
             }
         }

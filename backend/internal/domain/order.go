@@ -34,12 +34,14 @@ type OrderItem struct {
 
 // Order ข้อมูลคำสั่งซื้อ
 type Order struct {
-	ID          int         `json:"id"`
-	UserID      int         `json:"user_id"`
-	TotalAmount float64     `json:"total_amount"`
-	Status      string      `json:"status"` // pending, paid, cancelled
-	Items       []OrderItem `json:"items,omitempty"`
-	CreatedAt   time.Time   `json:"created_at"`
+	ID             int         `json:"id"`
+	UserID         int         `json:"user_id"`
+	TotalAmount    float64     `json:"total_amount"`
+	DiscountAmount float64     `json:"discount_amount"`     // 👈 ยอดส่วนลดจากคูปอง
+	CouponID       *int        `json:"coupon_id,omitempty"` // 👈 คูปองที่ใช้
+	Status         string      `json:"status"`              // pending, paid, cancelled
+	Items          []OrderItem `json:"items,omitempty"`
+	CreatedAt      time.Time   `json:"created_at"`
 }
 
 // CheckoutItemInput ข้อมูลสินค้าแต่ละชิ้นที่ส่งมาตอน Checkout
@@ -50,7 +52,8 @@ type CheckoutItemInput struct {
 
 // CheckoutInput ข้อมูลรวมที่ส่งมาจากหน้าบ้านตอนกดสั่งซื้อ
 type CheckoutInput struct {
-	Items []CheckoutItemInput `json:"items"`
+	Items      []CheckoutItemInput `json:"items"`
+	CouponCode string              `json:"coupon_code,omitempty"`
 }
 
 // ==========================================
@@ -59,7 +62,7 @@ type CheckoutInput struct {
 
 // OrderRepository สัญญาการทำงานของ Data Access Layer สำหรับ Order
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, userID int, items []CheckoutItemInput) (*Order, error)
+	CreateOrder(ctx context.Context, userID int, input CheckoutInput) (*Order, error)
 	FindOrderByID(ctx context.Context, orderID, userID int) (*Order, error)
 	FindOrdersByUserID(ctx context.Context, userID int) ([]Order, error)
 	FindAllOrders(ctx context.Context) ([]Order, error)
